@@ -3,8 +3,8 @@
 import { Icon } from "@iconify/react";
 import { useCallback, useMemo, useState } from "react";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { CONFIG } from "@/lib/config";
-import { addMinutes, fmtDate } from "@/lib/format";
+import { PROFESSORS } from "@/lib/config";
+import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
 type Tab = "all" | "student" | "pin";
@@ -29,6 +29,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const [showPast, setShowPast] = useState(false);
   const [studentQuery, setStudentQuery] = useState("");
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [profFilter, setProfFilter] = useState<string>("all");
 
   // PIN 변경
   const [curPin, setCurPin] = useState("");
@@ -141,8 +142,9 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
       .sort((a, b) => a[0].localeCompare(b[0]));
   }, [rows, studentQuery]);
 
-  const visible = rows.filter((r) => showPast || r.date >= today);
-  const upcomingCount = rows.filter((r) => r.date >= today).length;
+  const filtered = rows.filter((r) => profFilter === "all" || r.professorId === profFilter);
+  const visible = filtered.filter((r) => showPast || r.date >= today);
+  const upcomingCount = filtered.filter((r) => r.date >= today).length;
 
   const digitsOnly = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
@@ -190,9 +192,11 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
       <li className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${past ? "border-neutral-100 text-neutral-400" : "border-neutral-200"}`}>
         <div className="min-w-0 flex-1">
           <div className="text-sm">
+            <span className="font-medium">{profName(r.professorId)}</span>
+            <span className="mx-1 text-neutral-300">|</span>
             {fmtDate(r.date)} <span className="mx-1 text-neutral-300">|</span>
             <span className="font-semibold">
-              {r.time} ~ {addMinutes(r.time, CONFIG.slotMinutes)}
+              {fmtRange(r.professorId, r.time)}
             </span>
           </div>
           {showStudent && (
@@ -259,9 +263,24 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
 
         {tab === "all" && (
           <>
+            <div className="mb-4 flex flex-wrap gap-1">
+              {[{ id: "all", name: "전체" }, ...PROFESSORS].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setProfFilter(p.id)}
+                  className={[
+                    "rounded-full border px-3 py-1 text-sm transition",
+                    profFilter === p.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
+                  ].join(" ")}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold tracking-tight">
-                전체 예약 <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {rows.length}건</span>
+                전체 예약 <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {filtered.length}건</span>
               </h2>
               <label className="flex items-center gap-1.5 text-sm text-neutral-600">
                 <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="accent-neutral-900" />
