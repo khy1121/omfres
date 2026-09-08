@@ -2,6 +2,7 @@
 
 import { Icon } from "@iconify/react";
 import { useCallback, useMemo, useState } from "react";
+import AdminCalendar, { PROF_STYLE } from "./AdminCalendar";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
 import { PROFESSORS } from "@/lib/config";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
@@ -30,6 +31,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const [studentQuery, setStudentQuery] = useState("");
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [profFilter, setProfFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
 
   // PIN 변경
   const [curPin, setCurPin] = useState("");
@@ -229,7 +231,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-5xl">
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex gap-1 rounded-lg border border-neutral-200 bg-white p-1">
           {tabs.map((t) => (
@@ -270,25 +272,55 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
                   type="button"
                   onClick={() => setProfFilter(p.id)}
                   className={[
-                    "rounded-full border px-3 py-1 text-sm transition",
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition",
                     profFilter === p.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
                   ].join(" ")}
                 >
+                  {p.id !== "all" && <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${PROF_STYLE[p.id] ?? ""}`} />}
                   {p.name}
                 </button>
               ))}
             </div>
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-bold tracking-tight">
-                전체 예약 <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {filtered.length}건</span>
+                {profFilter === "all" ? "전체 예약" : profName(profFilter)}{" "}
+                <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {filtered.length}건</span>
               </h2>
-              <label className="flex items-center gap-1.5 text-sm text-neutral-600">
-                <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="accent-neutral-900" />
-                지난 예약 표시
-              </label>
+              <div className="flex items-center gap-3">
+                {viewMode === "list" && (
+                  <label className="flex items-center gap-1.5 text-sm text-neutral-600">
+                    <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="accent-neutral-900" />
+                    지난 예약 표시
+                  </label>
+                )}
+                <div className="flex rounded-lg border border-neutral-300 p-0.5" role="group" aria-label="보기 방식">
+                  {(
+                    [
+                      { key: "list", icon: "lucide:list", label: "목록" },
+                      { key: "calendar", icon: "lucide:calendar-days", label: "캘린더" },
+                    ] as const
+                  ).map((v) => (
+                    <button
+                      key={v.key}
+                      type="button"
+                      onClick={() => setViewMode(v.key)}
+                      className={[
+                        "flex items-center gap-1 rounded-md px-2.5 py-1 text-sm transition",
+                        viewMode === v.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100",
+                      ].join(" ")}
+                      aria-pressed={viewMode === v.key}
+                    >
+                      <Icon icon={v.icon} width={15} />
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             {loading && rows.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">불러오는 중</p>
+            ) : viewMode === "calendar" ? (
+              <AdminCalendar rows={filtered} today={today} profFilter={profFilter} busy={busy} onDelete={remove} />
             ) : visible.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">예약이 없습니다.</p>
             ) : (
