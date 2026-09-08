@@ -15,7 +15,7 @@ export default function Nav() {
   return (
     <nav className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
+        <Link href="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap font-bold tracking-tight">
           <Icon icon="lucide:message-square-text" width={20} />
           상담 예약
         </Link>
@@ -27,7 +27,7 @@ export default function Nav() {
                 key={l.href}
                 href={l.href}
                 className={[
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition",
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm transition sm:px-3",
                   active ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
                 ].join(" ")}
               >
