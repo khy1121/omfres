@@ -12,7 +12,7 @@ export default async function AdminPage() {
     : [];
   return (
     <main className="px-4 py-8">
-      <header className="mx-auto mb-6 max-w-2xl">
+      <header className="mx-auto mb-6 max-w-5xl">
         <h1 className="text-2xl font-bold tracking-tight">관리자</h1>
         <p className="mt-1 text-sm text-neutral-500">전체 상담 예약을 조회하고 관리합니다.</p>
       </header>
