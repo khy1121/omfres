@@ -22,13 +22,14 @@ type Props = {
   profFilter: string;
   busy: boolean;
   onDelete: (id: string) => Promise<void>;
+  onMove: (r: Reservation) => void;
 };
 
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function AdminCalendar({ rows, today, profFilter, busy, onDelete }: Props) {
+export default function AdminCalendar({ rows, today, profFilter, busy, onDelete, onMove }: Props) {
   const [ty, tm] = today.split("-").map(Number);
   const [view, setView] = useState({ y: ty, m: tm - 1 });
   const [selected, setSelected] = useState<string | null>(null);
@@ -200,14 +201,28 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
                       </button>
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmId(r.id)}
-                      className="rounded-md p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-                      aria-label="예약 삭제"
-                    >
-                      <Icon icon="lucide:trash-2" width={16} />
-                    </button>
+                    <span className="flex shrink-0">
+                      {r.date >= today && (
+                        <button
+                          type="button"
+                          onClick={() => onMove(r)}
+                          className="rounded-md p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                          aria-label="예약 옮기기"
+                          title="옮기기"
+                        >
+                          <Icon icon="lucide:move" width={16} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setConfirmId(r.id)}
+                        className="rounded-md p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                        aria-label="예약 삭제"
+                        title="삭제"
+                      >
+                        <Icon icon="lucide:trash-2" width={16} />
+                      </button>
+                    </span>
                   )}
                 </li>
               ))}

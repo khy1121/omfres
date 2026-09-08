@@ -3,8 +3,10 @@
 import { Icon } from "@iconify/react";
 import { useCallback, useMemo, useState } from "react";
 import AdminCalendar, { PROF_STYLE } from "./AdminCalendar";
+import AdminEditor, { EditorMode } from "./AdminEditor";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
 import { PROFESSORS } from "@/lib/config";
+import { downloadCsv, reservationsToCsv } from "@/lib/csv";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
@@ -32,6 +34,8 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [profFilter, setProfFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [editor, setEditor] = useState<EditorMode | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // PIN 변경
   const [curPin, setCurPin] = useState("");
@@ -130,6 +134,13 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
     }
   };
 
+  const exportCsv = () => {
+    const target = profFilter === "all" ? rows : rows.filter((r) => r.professorId === profFilter);
+    const sorted = [...target].sort((a, b) => `${a.professorId}${a.date}${a.time}`.localeCompare(`${b.professorId}${b.date}${b.time}`));
+    const suffix = profFilter === "all" ? "전체" : profName(profFilter).replace(" 교수님", "");
+    downloadCsv(`상담예약_${suffix}_${today}.csv`, reservationsToCsv(sorted));
+  };
+
   // 학생별 그룹
   const byStudent = useMemo(() => {
     const m = new Map<string, { name: string; items: Reservation[] }>();
@@ -217,14 +228,31 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmId(r.id)}
-            className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
-            aria-label="예약 삭제"
-          >
-            <Icon icon="lucide:trash-2" width={18} />
-          </button>
+          <div className="flex shrink-0">
+            {!past && (
+              <button
+                type="button"
+                onClick={() => {
+                  setNotice(null);
+                  setEditor({ kind: "move", r });
+                }}
+                className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                aria-label="예약 옮기기"
+                title="옮기기"
+              >
+                <Icon icon="lucide:move" width={18} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setConfirmId(r.id)}
+              className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+              aria-label="예약 삭제"
+              title="삭제"
+            >
+              <Icon icon="lucide:trash-2" width={18} />
+            </button>
+          </div>
         )}
       </li>
     );
@@ -249,7 +277,22 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             </button>
           ))}
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setNotice(null);
+              setEditor({ kind: "create" });
+            }}
+            className={`${btnPrimary} whitespace-nowrap px-3 py-1.5`}
+          >
+            <Icon icon="lucide:plus" width={16} />
+            예약 추가
+          </button>
+          <button type="button" onClick={exportCsv} disabled={rows.length === 0} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`} title="엑셀(CSV)로 내려받기">
+            <Icon icon="lucide:download" width={16} />
+            CSV
+          </button>
           <button type="button" onClick={load} className={`${btnSecondary} px-3 py-1.5`} aria-label="새로고침">
             <Icon icon="lucide:refresh-cw" width={16} className={loading ? "animate-spin" : ""} />
           </button>
@@ -261,7 +304,29 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
       </div>
 
       <Card>
+        {editor ? (
+          <AdminEditor
+            mode={editor}
+            today={today}
+            onCancel={() => setEditor(null)}
+            onDone={async (msg) => {
+              setEditor(null);
+              setNotice(msg);
+              await load();
+            }}
+          />
+        ) : (
+          <>
         {listError && <ErrorBox>{listError}</ErrorBox>}
+        {notice && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+            <Icon icon="lucide:check-circle" width={18} className="mt-0.5 shrink-0" />
+            <span className="flex-1">{notice}</span>
+            <button type="button" onClick={() => setNotice(null)} className="shrink-0 opacity-70 hover:opacity-100" aria-label="닫기">
+              <Icon icon="lucide:x" width={16} />
+            </button>
+          </div>
+        )}
 
         {tab === "all" && (
           <>
@@ -320,7 +385,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             {loading && rows.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">불러오는 중</p>
             ) : viewMode === "calendar" ? (
-              <AdminCalendar rows={filtered} today={today} profFilter={profFilter} busy={busy} onDelete={remove} />
+              <AdminCalendar rows={filtered} today={today} profFilter={profFilter} busy={busy} onDelete={remove} onMove={(r) => { setNotice(null); setEditor({ kind: "move", r }); }} />
             ) : visible.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">예약이 없습니다.</p>
             ) : (
@@ -410,6 +475,8 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
               PIN 변경
             </button>
           </form>
+        )}
+          </>
         )}
       </Card>
     </div>
