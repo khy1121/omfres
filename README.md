@@ -1,10 +1,10 @@
 # 상담 예약 사이트
 
-캘린더에서 날짜 → 30분 단위 시작 시간 → 학번/이름 입력 순으로 예약하는 Next.js 앱입니다.
+교수님 선택 → 캘린더에서 날짜 → 시작 시간 → 학번/이름 입력 순으로 예약하는 Next.js 앱입니다.
 
 ## 페이지
 
-- `/` 예약하기 (날짜 → 시간 → 학번/이름)
+- `/` 예약하기 (교수님 → 날짜 → 시간 → 학번/이름)
 - `/my` 내 예약 조회 · 일정 변경 · 취소 (학번 + 이름으로 본인 확인)
 - `/admin` 관리자: 전체 예약 / 학생별 조회 / 예약 삭제 / PIN 변경
   - 초기 PIN은 `000000` (환경변수 `ADMIN_PIN`으로 변경 가능). **배포 후 반드시 관리자 페이지에서 PIN을 바꾸세요.**
@@ -26,15 +26,25 @@ npm run dev
    연결하면 `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (또는 `KV_REST_API_*`)이 자동 주입됩니다.
 3. Redeploy.
 
-## 설정 변경
+## 교수님별 일정 설정
 
-`src/lib/config.ts` 에서 운영 시간, 슬롯 간격(기본 30분), 예약 가능 요일, 점심시간 제외 구간 등을 수정합니다.
+`src/lib/config.ts` 의 `PROFESSORS` 배열에서 관리합니다.
+
+| 교수님 | 요일 · 시간 | 단위 | 비고 |
+| --- | --- | --- | --- |
+| 전유부 | 월·목·금 10:00~17:00 | 60분 | 9/21, 10/15 제외 |
+| 정병덕 | 화 09:00~16:00 | 30분 | 9/22, 9/29, 10/6, 10/13 만 가능 |
+| 최정섭 | 월·수·목·금 09:00~20:00 | 30분 | 목요일은 17:00까지 |
+
+- `availability`: 요일별 시작/종료 시각 (종료 시각은 상담이 끝나야 하는 상한)
+- `slotMinutes`: 상담 1회 길이. 시작 시각은 이 간격으로 생성됩니다.
+- `excludeDates`: 예약 불가 날짜, `onlyDates`: 지정 시 이 날짜만 예약 가능
 
 ## API
 
-- `GET /api/slots?date=YYYY-MM-DD` — 해당 날짜의 슬롯과 예약 가능 여부
+- `GET /api/slots?professor=&date=YYYY-MM-DD` — 해당 교수님/날짜의 슬롯과 예약 가능 여부
 - `GET /api/reservations?studentId=&name=` — 내 예약 목록
-- `POST /api/reservations` — `{ date, time, studentId, name }` 예약 생성 (중복 시 409)
+- `POST /api/reservations` — `{ professorId, date, time, studentId, name }` 예약 생성 (중복 시 409)
 - `PATCH /api/reservations/:id` — `{ studentId, name, date, time }` 일정 변경
 - `DELETE /api/reservations/:id?studentId=&name=` — 예약 취소
 - `POST /api/admin/login` `{ pin }` / `POST /api/admin/logout`
