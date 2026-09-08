@@ -17,7 +17,6 @@ export default function BookingFlow({ today }: { today: string }) {
   const [professor, setProfessor] = useState<Professor | null>(null);
   const [date, setDate] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
-  const [studentId, setStudentId] = useState("");
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +30,7 @@ export default function BookingFlow({ today }: { today: string }) {
       const res = await fetch("/api/reservations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ professorId: professor?.id, date, time, studentId, name }),
+        body: JSON.stringify({ professorId: professor?.id, date, time, name }),
       });
       const j = await res.json();
       if (!res.ok) {
@@ -58,7 +57,6 @@ export default function BookingFlow({ today }: { today: string }) {
     setProfessor(null);
     setDate(null);
     setTime(null);
-    setStudentId("");
     setName("");
     setError(null);
     setConflict(null);
@@ -144,18 +142,6 @@ export default function BookingFlow({ today }: { today: string }) {
           <form onSubmit={submit}>
             <StepHeader title="정보를 입력하세요" onBack={() => setStep(2)} />
             {summary}
-            <Field label="학번" icon="lucide:hash">
-              <input
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value.replace(/\D/g, ""))}
-                inputMode="numeric"
-                placeholder="예: 2024123"
-                required
-                minLength={6}
-                maxLength={10}
-                className={inputCls}
-              />
-            </Field>
             <Field label="이름" icon="lucide:user">
               <input
                 value={name}
@@ -188,7 +174,7 @@ export default function BookingFlow({ today }: { today: string }) {
                 {time} ~ {addMinutes(time, professor.slotMinutes)}
               </div>
               <div className="mt-1 text-neutral-600">
-                {name} ({studentId})
+                {name}
               </div>
             </div>
             <div className="flex gap-2">

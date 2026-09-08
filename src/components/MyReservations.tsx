@@ -11,7 +11,6 @@ import type { Reservation } from "@/lib/store";
 type View = { kind: "lookup" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
 
 export default function MyReservations({ today }: { today: string }) {
-  const [studentId, setStudentId] = useState("");
   const [name, setName] = useState("");
   const [view, setView] = useState<View>({ kind: "lookup" });
   const [rows, setRows] = useState<Reservation[]>([]);
@@ -19,7 +18,7 @@ export default function MyReservations({ today }: { today: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const query = () => `studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(name)}`;
+  const query = () => `name=${encodeURIComponent(name)}`;
 
   const load = async () => {
     const res = await fetch(`/api/reservations?${query()}`, { cache: "no-store" });
@@ -49,7 +48,7 @@ export default function MyReservations({ today }: { today: string }) {
       const res = await fetch(`/api/reservations/${r.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId, name, date, time }),
+        body: JSON.stringify({ name, date, time }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
@@ -90,19 +89,7 @@ export default function MyReservations({ today }: { today: string }) {
         {view.kind === "lookup" && (
           <form onSubmit={lookup}>
             <StepHeader title="예약 조회" />
-            <p className="mb-5 text-sm text-neutral-600">예약 시 입력한 학번과 이름으로 조회합니다.</p>
-            <Field label="학번" icon="lucide:hash">
-              <input
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value.replace(/\D/g, ""))}
-                inputMode="numeric"
-                placeholder="예: 2024123"
-                required
-                minLength={6}
-                maxLength={10}
-                className={inputCls}
-              />
-            </Field>
+            <p className="mb-5 text-sm text-neutral-600">예약 시 입력한 이름으로 조회합니다.</p>
             <Field label="이름" icon="lucide:user">
               <input
                 value={name}
@@ -133,7 +120,7 @@ export default function MyReservations({ today }: { today: string }) {
               }}
             />
             <p className="mb-4 text-sm text-neutral-600">
-              {name} ({studentId})
+              {name}
             </p>
             {notice && (
               <div className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">

@@ -132,13 +132,13 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const byStudent = useMemo(() => {
     const m = new Map<string, { name: string; items: Reservation[] }>();
     for (const r of rows) {
-      const g = m.get(r.studentId) ?? { name: r.name, items: [] };
+      const g = m.get(r.name) ?? { name: r.name, items: [] };
       g.items.push(r);
-      m.set(r.studentId, g);
+      m.set(r.name, g);
     }
     const q = studentQuery.trim();
     return [...m.entries()]
-      .filter(([sid, g]) => !q || sid.includes(q) || g.name.includes(q))
+      .filter(([, g]) => !q || g.name.includes(q))
       .sort((a, b) => a[0].localeCompare(b[0]));
   }, [rows, studentQuery]);
 
@@ -201,7 +201,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
           </div>
           {showStudent && (
             <div className="mt-0.5 text-sm text-neutral-600">
-              {r.name} <span className="text-neutral-400">({r.studentId})</span>
+              {r.name}
             </div>
           )}
         </div>
@@ -309,7 +309,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
               <input
                 value={studentQuery}
                 onChange={(e) => setStudentQuery(e.target.value)}
-                placeholder="학번 또는 이름 검색"
+                placeholder="이름 검색"
                 className={`${inputCls} pl-9`}
               />
             </div>
@@ -324,7 +324,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
                       <summary className="flex cursor-pointer items-center justify-between px-4 py-3">
                         <span className="flex items-center gap-2 font-semibold">
                           <Icon icon="lucide:user" width={16} />
-                          {g.name} <span className="font-normal text-neutral-500">({sid})</span>
+                          {g.name}
                         </span>
                         <span className="text-sm text-neutral-500">{g.items.length}건</span>
                       </summary>

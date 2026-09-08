@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 import { getProfessor } from "@/lib/config";
-import { validateName, validateSlot, validateStudentId } from "@/lib/validate";
+import { validateName, validateSlot } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-/** 본인 확인: 학번 + 이름이 예약과 일치해야 함 */
-async function authorize(id: string, studentId: unknown, name: unknown) {
-  const sid = validateStudentId(studentId);
+/** 본인 확인: 이름이 예약과 일치해야 함 */
+async function authorize(id: string, name: unknown) {
   const nm = validateName(name);
-  if (!sid || !nm) return { error: "학번과 이름을 정확히 입력해주세요.", status: 400 } as const;
+  if (!nm) return { error: "이름을 정확히 입력해주세요.", status: 400 } as const;
   const r = await getStore().get(id);
-  if (!r || r.studentId !== sid || r.name !== nm) {
+  if (!r || r.name !== nm) {
     return { error: "예약을 찾을 수 없습니다.", status: 404 } as const;
   }
   return { reservation: r } as const;
@@ -22,13 +21,13 @@ async function authorize(id: string, studentId: unknown, name: unknown) {
 /** 예약 수정 (날짜/시간 변경) */
 export async function PATCH(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
-  let body: { studentId?: string; name?: string; date?: string; time?: string };
+  let body: { name?: string; date?: string; time?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const auth = await authorize(id, body.studentId, body.name);
+  const auth = await authorize(id, body.name);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   const prof = getProfessor(auth.reservation.professorId);
@@ -50,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   const { id } = await params;
   const sp = req.nextUrl.searchParams;
-  const auth = await authorize(id, sp.get("studentId"), sp.get("name"));
+  const auth = await authorize(id, sp.get("name"));
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   await getStore().remove(id);
   return NextResponse.json({ ok: true });

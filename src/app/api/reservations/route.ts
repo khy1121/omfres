@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore, Reservation } from "@/lib/store";
-import { validateName, validateProfessor, validateSlot, validateStudentId } from "@/lib/validate";
+import { validateName, validateProfessor, validateSlot } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
-/** 예약 조회: ?studentId=&name= (학번 + 이름 일치 시에만 반환) */
+/** 예약 조회: ?name= (이름 일치 시 반환) */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const studentId = validateStudentId(sp.get("studentId"));
   const name = validateName(sp.get("name"));
-  if (!studentId || !name) {
-    return NextResponse.json({ error: "학번과 이름을 정확히 입력해주세요." }, { status: 400 });
+  if (!name) {
+    return NextResponse.json({ error: "이름을 정확히 입력해주세요." }, { status: 400 });
   }
-  const rows = (await getStore().listByStudent(studentId))
-    .filter((r) => r.name === name)
-    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const rows = (await getStore().listByName(name)).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
   return NextResponse.json({ reservations: rows });
 }
 
@@ -31,8 +28,6 @@ export async function POST(req: NextRequest) {
   if (!prof) return NextResponse.json({ error: "교수님을 선택해주세요." }, { status: 400 });
   const slotError = validateSlot(prof, body.date, body.time);
   if (slotError) return NextResponse.json({ error: slotError }, { status: 400 });
-  const studentId = validateStudentId(body.studentId);
-  if (!studentId) return NextResponse.json({ error: "학번은 6~10자리 숫자로 입력해주세요." }, { status: 400 });
   const name = validateName(body.name);
   if (!name) return NextResponse.json({ error: "이름은 2~20자로 입력해주세요." }, { status: 400 });
 
@@ -41,7 +36,6 @@ export async function POST(req: NextRequest) {
     professorId: prof.id,
     date: String(body.date),
     time: String(body.time),
-    studentId,
     name,
     createdAt: new Date().toISOString(),
   };

@@ -5,7 +5,6 @@ export type Reservation = {
   professorId: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM (상담 시작시간)
-  studentId: string;
   name: string;
   createdAt: string;
   updatedAt?: string;
@@ -17,8 +16,8 @@ export interface Store {
   /** 슬롯을 원자적으로 선점하여 예약 생성. 이미 있으면 false */
   create(r: Reservation): Promise<boolean>;
   get(id: string): Promise<Reservation | null>;
-  /** 학번 기준 예약 목록 */
-  listByStudent(studentId: string): Promise<Reservation[]>;
+  /** 이름 기준 예약 목록 */
+  listByName(name: string): Promise<Reservation[]>;
   /** 날짜/시간 변경. 새 슬롯이 이미 차 있으면 false */
   move(id: string, date: string, time: string): Promise<boolean>;
   remove(id: string): Promise<void>;
@@ -32,7 +31,7 @@ export interface Store {
 const slotKey = (p: string, date: string, time: string) => `slot:${p}:${date}:${time}`;
 const dayKey = (p: string, date: string) => `day:${p}:${date}`;
 const resvKey = (id: string) => `resv:${id}`;
-const studentKey = (sid: string) => `student:${sid}`;
+const nameKey = (name: string) => `name:${name}`;
 const ALL_KEY = "resv:all";
 const PIN_KEY = "admin:pin";
 
@@ -50,7 +49,7 @@ function makeRedisStore(): Store {
       await Promise.all([
         redis.set(resvKey(r.id), r),
         redis.sadd(dayKey(r.professorId, r.date), r.time),
-        redis.sadd(studentKey(r.studentId), r.id),
+        redis.sadd(nameKey(r.name), r.id),
         redis.sadd(ALL_KEY, r.id),
       ]);
       return true;
@@ -58,8 +57,8 @@ function makeRedisStore(): Store {
     async get(id) {
       return (await redis.get<Reservation>(resvKey(id))) ?? null;
     },
-    async listByStudent(studentId) {
-      const ids = (await redis.smembers(studentKey(studentId))) ?? [];
+    async listByName(name) {
+      const ids = (await redis.smembers(nameKey(name))) ?? [];
       if (ids.length === 0) return [];
       const rows = await redis.mget<(Reservation | null)[]>(...ids.map(resvKey));
       return rows.filter((r): r is Reservation => !!r);
@@ -84,7 +83,7 @@ function makeRedisStore(): Store {
       await Promise.all([
         redis.del(slotKey(r.professorId, r.date, r.time)),
         redis.srem(dayKey(r.professorId, r.date), r.time),
-        redis.srem(studentKey(r.studentId), id),
+        redis.srem(nameKey(r.name), id),
         redis.srem(ALL_KEY, id),
         redis.del(resvKey(id)),
       ]);
@@ -122,8 +121,8 @@ function makeMemoryStore(): Store {
     async get(id) {
       return map.get(id) ?? null;
     },
-    async listByStudent(studentId) {
-      return [...map.values()].filter((r) => r.studentId === studentId);
+    async listByName(name) {
+      return [...map.values()].filter((r) => r.name === name);
     },
     async move(id, date, time) {
       const r = map.get(id);

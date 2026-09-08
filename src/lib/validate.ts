@@ -1,10 +1,5 @@
 import { generateTimeSlots, getProfessor, isDateSelectable, nowTimeKST, Professor, todayKST } from "./config";
 
-export function validateStudentId(v: unknown): string | null {
-  const s = String(v ?? "").trim();
-  return /^\d{6,10}$/.test(s) ? s : null;
-}
-
 export function validateName(v: unknown): string | null {
   const s = String(v ?? "").trim();
   return s.length >= 2 && s.length <= 20 ? s : null;
