@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore, Reservation } from "@/lib/store";
-import { validateName, validateSlot, validateStudentId } from "@/lib/validate";
+import { validateName, validateProfessor, validateSlot, validateStudentId } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const slotError = validateSlot(body.date, body.time);
+  const prof = validateProfessor(body.professorId);
+  if (!prof) return NextResponse.json({ error: "교수님을 선택해주세요." }, { status: 400 });
+  const slotError = validateSlot(prof, body.date, body.time);
   if (slotError) return NextResponse.json({ error: slotError }, { status: 400 });
   const studentId = validateStudentId(body.studentId);
   if (!studentId) return NextResponse.json({ error: "학번은 6~10자리 숫자로 입력해주세요." }, { status: 400 });
@@ -36,6 +38,7 @@ export async function POST(req: NextRequest) {
 
   const reservation: Reservation = {
     id: crypto.randomUUID(),
+    professorId: prof.id,
     date: String(body.date),
     time: String(body.time),
     studentId,

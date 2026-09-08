@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
+import { getProfessor } from "@/lib/config";
 import { validateName, validateSlot, validateStudentId } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const auth = await authorize(id, body.studentId, body.name);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-  const slotError = validateSlot(body.date, body.time);
+  const prof = getProfessor(auth.reservation.professorId);
+  if (!prof) return NextResponse.json({ error: "교수님 정보를 찾을 수 없습니다." }, { status: 400 });
+  const slotError = validateSlot(prof, body.date, body.time);
   if (slotError) return NextResponse.json({ error: slotError }, { status: 400 });
   const date = String(body.date);
   const time = String(body.time);
