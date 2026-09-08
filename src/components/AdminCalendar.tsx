@@ -92,8 +92,8 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[640px]">
+      <div>
+        <div>
           <div className="grid grid-cols-7 text-center text-xs font-medium text-neutral-500">
             {WEEKDAYS.map((w) => (
               <div key={w} className="py-1">
@@ -103,7 +103,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
           </div>
           <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-neutral-200 bg-neutral-200">
             {cells.map((d, i) => {
-              if (d === null) return <div key={i} className="min-h-24 bg-neutral-50" />;
+              if (d === null) return <div key={i} className="min-h-14 bg-neutral-50 sm:min-h-24" />;
               const date = ymd(view.y, view.m, d);
               const list = byDate.get(date) ?? [];
               const isToday = date === today;
@@ -118,7 +118,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
                     setConfirmId(null);
                   }}
                   className={[
-                    "flex min-h-24 flex-col items-stretch gap-0.5 bg-white p-1 text-left transition",
+                    "flex min-h-14 flex-col items-stretch gap-0.5 bg-white p-0.5 text-left transition sm:min-h-24 sm:p-1",
                     isSel ? "ring-2 ring-neutral-900 ring-inset" : "hover:bg-neutral-50",
                     past ? "text-neutral-400" : "",
                   ].join(" ")}
@@ -126,21 +126,38 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
                   <span className={`mb-0.5 self-start rounded-full px-1.5 text-xs ${isToday ? "bg-neutral-900 font-semibold text-white" : ""}`}>
                     {d}
                   </span>
-                  {list.slice(0, 6).map((r) => (
-                    <span
-                      key={r.id}
-                      className={`truncate rounded border px-1 text-[11px] leading-4 ${profFilter === "all" ? profStyle(r.professorId) : "border-neutral-300 bg-neutral-50"}`}
-                      title={`${profName(r.professorId)} ${r.time} ${r.name}`}
-                    >
-                      {r.time} {r.name}
+                  {/* 모바일: 건수 + 교수님 점 */}
+                  {list.length > 0 && (
+                    <span className="flex flex-col items-center gap-0.5 sm:hidden">
+                      <span className="text-sm font-semibold leading-none">{list.length}</span>
+                      {profFilter === "all" && (
+                        <span className="flex gap-0.5">
+                          {PROFESSORS.filter((p) => list.some((r) => r.professorId === p.id)).map((p) => (
+                            <span key={p.id} className={`inline-block h-1.5 w-1.5 rounded-full border ${profStyle(p.id)}`} />
+                          ))}
+                        </span>
+                      )}
                     </span>
-                  ))}
-                  {list.length > 6 && <span className="px-1 text-[11px] text-neutral-500">+{list.length - 6}건</span>}
+                  )}
+                  {/* 데스크톱: 시간 + 이름 */}
+                  <span className="hidden flex-col gap-0.5 sm:flex">
+                    {list.slice(0, 6).map((r) => (
+                      <span
+                        key={r.id}
+                        className={`truncate rounded border px-1 text-[11px] leading-4 ${profFilter === "all" ? profStyle(r.professorId) : "border-neutral-300 bg-neutral-50"}`}
+                        title={`${profName(r.professorId)} ${r.time} ${r.name}`}
+                      >
+                        {r.time} {r.name}
+                      </span>
+                    ))}
+                    {list.length > 6 && <span className="px-1 text-[11px] text-neutral-500">+{list.length - 6}건</span>}
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
+        <p className="mt-2 text-xs text-neutral-500 sm:hidden">날짜를 누르면 그날 예약 목록이 아래에 표시됩니다.</p>
       </div>
 
       {selected && (
@@ -159,10 +176,12 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete 
           ) : (
             <ul className="space-y-2">
               {selectedRows.map((r) => (
-                <li key={r.id} className="flex items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(r.professorId)}`}>{profName(r.professorId).replace(" 교수님", "")}</span>
-                  <span className="font-semibold">{fmtRange(r.professorId, r.time)}</span>
-                  <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                <li key={r.id} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                  <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(r.professorId)}`}>{profName(r.professorId).replace(" 교수님", "")}</span>
+                    <span className="font-semibold">{r.name}</span>
+                    <span className="text-neutral-600">{fmtRange(r.professorId, r.time)}</span>
+                  </span>
                   {confirmId === r.id ? (
                     <span className="flex gap-1">
                       <button type="button" onClick={() => setConfirmId(null)} className={`${btnSecondary} px-2.5 py-1 text-xs`}>

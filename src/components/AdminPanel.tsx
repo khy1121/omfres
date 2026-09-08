@@ -232,15 +232,15 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex gap-1 rounded-lg border border-neutral-200 bg-white p-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-1">
           {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
               className={[
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition",
+                "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition",
                 tab === t.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100",
               ].join(" ")}
             >
@@ -253,7 +253,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
           <button type="button" onClick={load} className={`${btnSecondary} px-3 py-1.5`} aria-label="새로고침">
             <Icon icon="lucide:refresh-cw" width={16} className={loading ? "animate-spin" : ""} />
           </button>
-          <button type="button" onClick={logout} className={`${btnSecondary} px-3 py-1.5`}>
+          <button type="button" onClick={logout} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`}>
             <Icon icon="lucide:log-out" width={16} />
             로그아웃
           </button>
@@ -272,7 +272,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
                   type="button"
                   onClick={() => setProfFilter(p.id)}
                   className={[
-                    "flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition",
+                    "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-sm transition",
                     profFilter === p.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
                   ].join(" ")}
                 >
@@ -305,7 +305,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
                       type="button"
                       onClick={() => setViewMode(v.key)}
                       className={[
-                        "flex items-center gap-1 rounded-md px-2.5 py-1 text-sm transition",
+                        "flex items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 text-sm transition",
                         viewMode === v.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100",
                       ].join(" ")}
                       aria-pressed={viewMode === v.key}
