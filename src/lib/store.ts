@@ -2,6 +2,7 @@ import { Redis } from "@upstash/redis";
 
 export type Reservation = {
   id: string;
+  professorId: string;
   date: string; // YYYY-MM-DD
   time: string; // HH:MM (상담 시작시간)
   studentId: string;
@@ -11,8 +12,8 @@ export type Reservation = {
 };
 
 export interface Store {
-  /** 해당 날짜의 예약된 시간 목록 */
-  bookedTimes(date: string): Promise<string[]>;
+  /** 해당 교수님/날짜의 예약된 시간 목록 */
+  bookedTimes(professorId: string, date: string): Promise<string[]>;
   /** 슬롯을 원자적으로 선점하여 예약 생성. 이미 있으면 false */
   create(r: Reservation): Promise<boolean>;
   get(id: string): Promise<Reservation | null>;
@@ -28,8 +29,8 @@ export interface Store {
   setAdminPinHash(hash: string): Promise<void>;
 }
 
-const slotKey = (date: string, time: string) => `slot:${date}:${time}`;
-const dayKey = (date: string) => `day:${date}`;
+const slotKey = (p: string, date: string, time: string) => `slot:${p}:${date}:${time}`;
+const dayKey = (p: string, date: string) => `day:${p}:${date}`;
 const resvKey = (id: string) => `resv:${id}`;
 const studentKey = (sid: string) => `student:${sid}`;
 const ALL_KEY = "resv:all";
@@ -39,16 +40,16 @@ const PIN_KEY = "admin:pin";
 function makeRedisStore(): Store {
   const redis = Redis.fromEnv();
   return {
-    async bookedTimes(date) {
-      return (await redis.smembers(dayKey(date))) ?? [];
+    async bookedTimes(professorId, date) {
+      return (await redis.smembers(dayKey(professorId, date))) ?? [];
     },
     async create(r) {
       // SET NX → 동시 요청 시 한 명만 성공
-      const ok = await redis.set(slotKey(r.date, r.time), r.id, { nx: true });
+      const ok = await redis.set(slotKey(r.professorId, r.date, r.time), r.id, { nx: true });
       if (ok !== "OK") return false;
       await Promise.all([
         redis.set(resvKey(r.id), r),
-        redis.sadd(dayKey(r.date), r.time),
+        redis.sadd(dayKey(r.professorId, r.date), r.time),
         redis.sadd(studentKey(r.studentId), r.id),
         redis.sadd(ALL_KEY, r.id),
       ]);
@@ -66,13 +67,13 @@ function makeRedisStore(): Store {
     async move(id, date, time) {
       const r = await this.get(id);
       if (!r) return false;
-      const ok = await redis.set(slotKey(date, time), id, { nx: true });
+      const ok = await redis.set(slotKey(r.professorId, date, time), id, { nx: true });
       if (ok !== "OK") return false;
       const updated: Reservation = { ...r, date, time, updatedAt: new Date().toISOString() };
       await Promise.all([
-        redis.del(slotKey(r.date, r.time)),
-        redis.srem(dayKey(r.date), r.time),
-        redis.sadd(dayKey(date), time),
+        redis.del(slotKey(r.professorId, r.date, r.time)),
+        redis.srem(dayKey(r.professorId, r.date), r.time),
+        redis.sadd(dayKey(r.professorId, date), time),
         redis.set(resvKey(id), updated),
       ]);
       return true;
@@ -81,8 +82,8 @@ function makeRedisStore(): Store {
       const r = await this.get(id);
       if (!r) return;
       await Promise.all([
-        redis.del(slotKey(r.date, r.time)),
-        redis.srem(dayKey(r.date), r.time),
+        redis.del(slotKey(r.professorId, r.date, r.time)),
+        redis.srem(dayKey(r.professorId, r.date), r.time),
         redis.srem(studentKey(r.studentId), id),
         redis.srem(ALL_KEY, id),
         redis.del(resvKey(id)),
@@ -107,14 +108,14 @@ function makeRedisStore(): Store {
 function makeMemoryStore(): Store {
   const g = globalThis as unknown as { __resv?: Map<string, Reservation>; __pin?: string | null };
   const map = (g.__resv ??= new Map());
-  const taken = (date: string, time: string, exceptId?: string) =>
-    [...map.values()].some((r) => r.date === date && r.time === time && r.id !== exceptId);
+  const taken = (p: string, date: string, time: string, exceptId?: string) =>
+    [...map.values()].some((r) => r.professorId === p && r.date === date && r.time === time && r.id !== exceptId);
   return {
-    async bookedTimes(date) {
-      return [...map.values()].filter((r) => r.date === date).map((r) => r.time);
+    async bookedTimes(professorId, date) {
+      return [...map.values()].filter((r) => r.professorId === professorId && r.date === date).map((r) => r.time);
     },
     async create(r) {
-      if (taken(r.date, r.time)) return false;
+      if (taken(r.professorId, r.date, r.time)) return false;
       map.set(r.id, r);
       return true;
     },
@@ -126,7 +127,7 @@ function makeMemoryStore(): Store {
     },
     async move(id, date, time) {
       const r = map.get(id);
-      if (!r || taken(date, time, id)) return false;
+      if (!r || taken(r.professorId, date, time, id)) return false;
       map.set(id, { ...r, date, time, updatedAt: new Date().toISOString() });
       return true;
     },
