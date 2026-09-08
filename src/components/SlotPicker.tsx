@@ -4,13 +4,14 @@ import { Icon } from "@iconify/react";
 import { useState } from "react";
 import Calendar from "./Calendar";
 import { ErrorBox, StepHeader } from "./ui";
-import { CONFIG, isDateSelectable } from "@/lib/config";
+import { CONFIG, isDateSelectable, Professor } from "@/lib/config";
 import { fmtDate } from "@/lib/format";
 
 type Slot = { time: string; available: boolean };
 
 type Props = {
   today: string;
+  professor: Professor;
   /** 수정 모드일 때 현재 예약 (해당 슬롯은 선택 가능하게 표시) */
   current?: { date: string; time: string };
   /** 첫 단계(날짜)에서 뒤로가기를 눌렀을 때. 없으면 버튼 숨김 */
@@ -20,7 +21,7 @@ type Props = {
   error?: string | null;
 };
 
-export default function SlotPicker({ today, current, onBack, onPick, error }: Props) {
+export default function SlotPicker({ today, professor, current, onBack, onPick, error }: Props) {
   const [date, setDate] = useState<string | null>(current?.date ?? null);
   const [stage, setStage] = useState<"date" | "time">("date");
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -34,7 +35,7 @@ export default function SlotPicker({ today, current, onBack, onPick, error }: Pr
     setLoadError(null);
     setSlots([]);
     try {
-      const res = await fetch(`/api/slots?date=${d}`, { cache: "no-store" });
+      const res = await fetch(`/api/slots?professor=${professor.id}&date=${d}`, { cache: "no-store" });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
       setSlots(j.slots ?? []);
@@ -45,14 +46,28 @@ export default function SlotPicker({ today, current, onBack, onPick, error }: Pr
     }
   };
 
+  const profLine = (
+    <p className="mb-4 flex items-center gap-1.5 text-sm text-neutral-600">
+      <Icon icon="lucide:graduation-cap" width={16} />
+      {professor.name}
+      {professor.note && <span className="text-neutral-400">· {professor.note}</span>}
+    </p>
+  );
+
   if (stage === "date") {
     return (
       <>
         <StepHeader title="상담 날짜를 선택하세요" onBack={onBack} />
-        <Calendar selected={date} onSelect={pickDate} isSelectable={isDateSelectable} today={today} />
+        {profLine}
+        <Calendar
+          selected={date}
+          onSelect={pickDate}
+          isSelectable={(d) => isDateSelectable(professor, d, today)}
+          today={today}
+        />
         <p className="mt-4 flex items-center gap-1.5 text-xs text-neutral-500">
           <Icon icon="lucide:info" width={14} />
-          평일만 예약 가능하며, 오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다.
+          상담 가능한 날짜만 선택할 수 있으며, 오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다.
         </p>
       </>
     );
@@ -64,12 +79,13 @@ export default function SlotPicker({ today, current, onBack, onPick, error }: Pr
   return (
     <>
       <StepHeader title="시작 시간을 선택하세요" onBack={() => setStage("date")} />
+      {profLine}
       <p className="mb-4 flex items-center gap-1.5 text-sm text-neutral-600">
         <Icon icon="lucide:calendar" width={16} />
         {date && fmtDate(date)}
         <span className="text-neutral-300">|</span>
         <Icon icon="lucide:clock" width={16} />
-        상담 {CONFIG.slotMinutes}분
+        상담 {professor.slotMinutes}분
       </p>
       {error && <ErrorBox>{error}</ErrorBox>}
       {loadError && <ErrorBox>{loadError}</ErrorBox>}
