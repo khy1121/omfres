@@ -151,6 +151,26 @@ export default function MyReservations({ today }: { today: string }) {
                         <div className="text-lg font-semibold tracking-tight">
                           {fmtRange(r.professorId, r.time)}
                         </div>
+                        {(() => {
+                          const p = getProfessor(r.professorId);
+                          if (!p?.office && !p?.phone) return null;
+                          return (
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-600">
+                              {p.office && (
+                                <span className="flex items-center gap-1">
+                                  <Icon icon="lucide:map-pin" width={13} />
+                                  {p.office}
+                                </span>
+                              )}
+                              {p.phone && (
+                                <a href={`tel:${p.phone}`} className="flex items-center gap-1 hover:underline">
+                                  <Icon icon="lucide:phone" width={13} />
+                                  {p.phone}
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <Icon icon="lucide:calendar-check" width={22} className="shrink-0 text-neutral-400" />
                     </div>

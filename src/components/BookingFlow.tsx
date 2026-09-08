@@ -176,6 +176,22 @@ export default function BookingFlow({ today }: { today: string }) {
               <div className="mt-1 text-neutral-600">
                 {name}
               </div>
+              {(professor.office || professor.phone) && (
+                <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 border-t border-neutral-200 pt-3 text-xs text-neutral-600">
+                  {professor.office && (
+                    <span className="flex items-center gap-1">
+                      <Icon icon="lucide:map-pin" width={13} />
+                      {professor.office}
+                    </span>
+                  )}
+                  {professor.phone && (
+                    <a href={`tel:${professor.phone}`} className="flex items-center gap-1 hover:underline">
+                      <Icon icon="lucide:phone" width={13} />
+                      {professor.phone}
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={reset} className={`${btnSecondary} flex-1`}>

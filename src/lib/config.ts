@@ -15,6 +15,8 @@ export type Professor = {
   onlyDates?: string[];
   /** 안내 문구 */
   note?: string;
+  phone?: string;
+  office?: string;
 };
 
 export const PROFESSORS: Professor[] = [
@@ -25,6 +27,8 @@ export const PROFESSORS: Professor[] = [
     availability: [{ days: [1, 4, 5], start: "10:00", end: "17:00" }],
     excludeDates: ["2026-09-21", "2026-10-15"],
     note: "월·목·금 10:00~17:00, 1시간 단위",
+    phone: "010-3301-2176",
+    office: "연구관 709호",
   },
   {
     id: "jung",
@@ -33,6 +37,8 @@ export const PROFESSORS: Professor[] = [
     availability: [{ days: [2], start: "09:00", end: "16:00" }],
     onlyDates: ["2026-09-22", "2026-09-29", "2026-10-06", "2026-10-13"],
     note: "화 09:00~16:00, 30분 단위 (9/22, 9/29, 10/6, 10/13)",
+    phone: "010-3456-8620",
+    office: "연구관 713호",
   },
   {
     id: "choi",
@@ -43,6 +49,8 @@ export const PROFESSORS: Professor[] = [
       { days: [4], start: "09:00", end: "17:00" }, // 목요일은 17시 이후 불가
     ],
     note: "월·수·목·금 09:00~20:00 (목요일은 17:00까지), 30분 단위",
+    phone: "010-6396-1151",
+    office: "연구관 618호",
   },
 ];
 
