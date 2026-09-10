@@ -308,16 +308,18 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
 
       <Card>
         {editor ? (
-          <AdminEditor
-            mode={editor}
-            today={today}
-            onCancel={() => setEditor(null)}
-            onDone={async (msg) => {
-              setEditor(null);
-              setNotice(msg);
-              await load();
-            }}
-          />
+          <div className="mx-auto w-full max-w-md">
+            <AdminEditor
+              mode={editor}
+              today={today}
+              onCancel={() => setEditor(null)}
+              onDone={async (msg) => {
+                setEditor(null);
+                setNotice(msg);
+                await load();
+              }}
+            />
+          </div>
         ) : (
           <>
         {listError && <ErrorBox>{listError}</ErrorBox>}
