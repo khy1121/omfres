@@ -3,17 +3,23 @@
 import { Icon } from "@iconify/react";
 import { useMemo, useState } from "react";
 import { btnPrimary, btnSecondary } from "./ui";
-import { PROFESSORS } from "@/lib/config";
+import { useProfessors } from "./ProfessorsProvider";
 import { fmtDate, fmtRange, profName, WEEKDAYS } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
-/** 교수님별 흑백 스타일 (범례와 캘린더 칩에 공통 사용) */
-export const PROF_STYLE: Record<string, string> = {
-  jeon: "bg-neutral-900 text-white border-neutral-900",
-  jung: "bg-white text-neutral-900 border-neutral-900",
-  choi: "bg-neutral-200 text-neutral-900 border-neutral-200",
-};
-const profStyle = (id: string) => PROF_STYLE[id] ?? "bg-neutral-100 text-neutral-900 border-neutral-100";
+/** 교수님별 흑백 스타일 (범례와 캘린더 칩에 공통 사용). 목록 순서대로 배정 */
+const PROF_STYLES = [
+  "bg-neutral-900 text-white border-neutral-900",
+  "bg-white text-neutral-900 border-neutral-900",
+  "bg-neutral-200 text-neutral-900 border-neutral-200",
+  "bg-neutral-500 text-white border-neutral-500",
+  "bg-neutral-100 text-neutral-900 border-dashed border-neutral-900",
+  "bg-neutral-700 text-white border-neutral-700",
+];
+export function profStyle(profs: { id: string }[], id: string) {
+  const i = profs.findIndex((p) => p.id === id);
+  return i < 0 ? "bg-neutral-100 text-neutral-900 border-neutral-100" : PROF_STYLES[i % PROF_STYLES.length];
+}
 
 type Props = {
   rows: Reservation[];
@@ -30,6 +36,7 @@ function ymd(y: number, m: number, d: number) {
 }
 
 export default function AdminCalendar({ rows, today, profFilter, busy, onDelete, onMove }: Props) {
+  const PROFESSORS = useProfessors();
   const [ty, tm] = today.split("-").map(Number);
   const [view, setView] = useState({ y: ty, m: tm - 1 });
   const [selected, setSelected] = useState<string | null>(null);
@@ -86,7 +93,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
         <div className="mb-3 flex flex-wrap gap-2 text-xs">
           {PROFESSORS.map((p) => (
             <span key={p.id} className="flex items-center gap-1.5">
-              <span className={`inline-block h-3 w-3 rounded-sm border ${profStyle(p.id)}`} />
+              <span className={`inline-block h-3 w-3 rounded-sm border ${profStyle(PROFESSORS, p.id)}`} />
               {p.name}
             </span>
           ))}
@@ -134,7 +141,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
                       {profFilter === "all" && (
                         <span className="flex gap-0.5">
                           {PROFESSORS.filter((p) => list.some((r) => r.professorId === p.id)).map((p) => (
-                            <span key={p.id} className={`inline-block h-1.5 w-1.5 rounded-full border ${profStyle(p.id)}`} />
+                            <span key={p.id} className={`inline-block h-1.5 w-1.5 rounded-full border ${profStyle(PROFESSORS, p.id)}`} />
                           ))}
                         </span>
                       )}
@@ -145,8 +152,8 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
                     {list.slice(0, 6).map((r) => (
                       <span
                         key={r.id}
-                        className={`truncate rounded border px-1 text-[11px] leading-4 ${profFilter === "all" ? profStyle(r.professorId) : "border-neutral-300 bg-neutral-50"}`}
-                        title={`${profName(r.professorId)} ${r.time} ${r.name}`}
+                        className={`truncate rounded border px-1 text-[11px] leading-4 ${profFilter === "all" ? profStyle(PROFESSORS, r.professorId) : "border-neutral-300 bg-neutral-50"}`}
+                        title={`${profName(PROFESSORS, r.professorId)} ${r.time} ${r.name}`}
                       >
                         {r.time} {r.name}
                       </span>
@@ -179,9 +186,9 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
               {selectedRows.map((r) => (
                 <li key={r.id} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(r.professorId)}`}>{profName(r.professorId).replace(" 교수님", "")}</span>
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(PROFESSORS, r.professorId)}`}>{profName(PROFESSORS, r.professorId).replace(" 교수님", "")}</span>
                     <span className="font-semibold">{r.name}</span>
-                    <span className="text-neutral-600">{fmtRange(r.professorId, r.time)}</span>
+                    <span className="text-neutral-600">{fmtRange(PROFESSORS, r.professorId, r.time)}</span>
                   </span>
                   {confirmId === r.id ? (
                     <span className="flex gap-1">

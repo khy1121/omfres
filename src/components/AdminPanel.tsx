@@ -2,21 +2,23 @@
 
 import { Icon } from "@iconify/react";
 import { useCallback, useMemo, useState } from "react";
-import AdminCalendar, { PROF_STYLE } from "./AdminCalendar";
+import AdminCalendar, { profStyle } from "./AdminCalendar";
 import AdminEditor, { EditorMode } from "./AdminEditor";
+import ProfessorManager from "./ProfessorManager";
+import { useProfessors } from "./ProfessorsProvider";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { PROFESSORS } from "@/lib/config";
 import { downloadCsv, reservationsToCsv } from "@/lib/csv";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
-type Tab = "all" | "student" | "pin";
+type Tab = "all" | "student" | "professors" | "pin";
 
 const pinInputCls = `${inputCls} text-center text-xl tracking-[0.5em] font-mono`;
 
 type Props = { initialAuthed: boolean; initialRows: Reservation[]; today: string };
 
 export default function AdminPanel({ initialAuthed, initialRows, today }: Props) {
+  const PROFESSORS = useProfessors();
   const [authed, setAuthed] = useState(initialAuthed);
   const [tab, setTab] = useState<Tab>("all");
 
@@ -137,8 +139,8 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const exportCsv = () => {
     const target = profFilter === "all" ? rows : rows.filter((r) => r.professorId === profFilter);
     const sorted = [...target].sort((a, b) => `${a.professorId}${a.date}${a.time}`.localeCompare(`${b.professorId}${b.date}${b.time}`));
-    const suffix = profFilter === "all" ? "전체" : profName(profFilter).replace(" 교수님", "");
-    downloadCsv(`상담예약_${suffix}_${today}.csv`, reservationsToCsv(sorted));
+    const suffix = profFilter === "all" ? "전체" : profName(PROFESSORS, profFilter).replace(" 교수님", "");
+    downloadCsv(`상담예약_${suffix}_${today}.csv`, reservationsToCsv(PROFESSORS, sorted));
   };
 
   // 학생별 그룹
@@ -196,6 +198,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: "all", label: "전체 예약", icon: "lucide:list" },
     { key: "student", label: "학생별", icon: "lucide:users" },
+    { key: "professors", label: "상담자 관리", icon: "lucide:graduation-cap" },
     { key: "pin", label: "PIN 변경", icon: "lucide:key-round" },
   ];
 
@@ -205,11 +208,11 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
       <li className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${past ? "border-neutral-100 text-neutral-400" : "border-neutral-200"}`}>
         <div className="min-w-0 flex-1">
           <div className="text-sm">
-            <span className="font-medium">{profName(r.professorId)}</span>
+            <span className="font-medium">{profName(PROFESSORS, r.professorId)}</span>
             <span className="mx-1 text-neutral-300">|</span>
             {fmtDate(r.date)} <span className="mx-1 text-neutral-300">|</span>
             <span className="font-semibold">
-              {fmtRange(r.professorId, r.time)}
+              {fmtRange(PROFESSORS, r.professorId, r.time)}
             </span>
           </div>
           {showStudent && (
@@ -341,14 +344,14 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
                     profFilter === p.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
                   ].join(" ")}
                 >
-                  {p.id !== "all" && <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${PROF_STYLE[p.id] ?? ""}`} />}
+                  {p.id !== "all" && <span className={`inline-block h-2.5 w-2.5 rounded-sm border ${profStyle(PROFESSORS, p.id)}`} />}
                   {p.name}
                 </button>
               ))}
             </div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-bold tracking-tight">
-                {profFilter === "all" ? "전체 예약" : profName(profFilter)}{" "}
+                {profFilter === "all" ? "전체 예약" : profName(PROFESSORS, profFilter)}{" "}
                 <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {filtered.length}건</span>
               </h2>
               <div className="flex items-center gap-3">
@@ -442,6 +445,8 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             </label>
           </>
         )}
+
+        {tab === "professors" && <ProfessorManager rows={rows} today={today} />}
 
         {tab === "pin" && (
           <form onSubmit={changePin} className="mx-auto max-w-sm">

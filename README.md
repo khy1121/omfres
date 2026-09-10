@@ -26,9 +26,11 @@ npm run dev
    연결하면 `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (또는 `KV_REST_API_*`)이 자동 주입됩니다.
 3. Redeploy.
 
-## 교수님별 일정 설정
+## 교수님(상담자) 관리
 
-`src/lib/config.ts` 의 `PROFESSORS` 배열에서 관리합니다.
+관리자 페이지(`/admin`) → **상담자 관리** 탭에서 상담자를 추가·수정·삭제하고 제약조건(상담 시간 단위, 요일별 시간대, 예약 불가 날짜, 지정 날짜만 허용)을 설정합니다. 목록은 Redis에 저장되며, 저장된 목록이 없으면 `src/lib/config.ts` 의 `DEFAULT_PROFESSORS` 가 초기값으로 쓰입니다.
+
+초기값:
 
 | 교수님 | 요일 · 시간 | 단위 | 비고 |
 | --- | --- | --- | --- |
@@ -39,10 +41,12 @@ npm run dev
 - `availability`: 요일별 시작/종료 시각 (종료 시각은 상담이 끝나야 하는 상한)
 - `slotMinutes`: 상담 1회 길이. 시작 시각은 이 간격으로 생성됩니다.
 - `excludeDates`: 예약 불가 날짜, `onlyDates`: 지정 시 이 날짜만 예약 가능
+- 상담자를 삭제해도 기존 예약은 남으며, 목록에는 이름 대신 ID로 표시됩니다.
 
 ## API
 
 - `GET /api/slots?professor=&date=YYYY-MM-DD` — 해당 교수님/날짜의 슬롯과 예약 가능 여부
+- `GET|POST /api/admin/professors`, `PUT|DELETE /api/admin/professors/:id` — 상담자 관리 (관리자 로그인 필요)
 - `GET /api/reservations?name=` — 내 예약 목록
 - `POST /api/reservations` — `{ professorId, date, time, name }` 예약 생성 (중복 시 409)
 - `PATCH /api/reservations/:id` — `{ name, date, time }` 일정 변경

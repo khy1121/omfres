@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateTimeSlots, getProfessor, isDateSelectable, nowTimeKST, todayKST } from "@/lib/config";
+import { generateTimeSlots, isDateSelectable, nowTimeKST, todayKST } from "@/lib/config";
+import { validateProfessor } from "@/lib/validate";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** ?professor=&date= → 해당 교수님/날짜의 슬롯과 예약 가능 여부 */
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const prof = getProfessor(sp.get("professor"));
+  const prof = await validateProfessor(sp.get("professor"));
   if (!prof) return NextResponse.json({ error: "교수님을 선택해주세요." }, { status: 400 });
   const date = sp.get("date") ?? "";
   if (!isDateSelectable(prof, date)) {

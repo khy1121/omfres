@@ -2,12 +2,15 @@
 
 import { Icon } from "@iconify/react";
 import { StepHeader } from "./ui";
-import { Professor, PROFESSORS } from "@/lib/config";
+import { useProfessors } from "./ProfessorsProvider";
+import { Professor } from "@/lib/config";
 
 export default function ProfessorPicker({ onPick }: { onPick: (p: Professor) => void }) {
+  const PROFESSORS = useProfessors();
   return (
     <>
       <StepHeader title="상담하실 교수님을 선택하세요" />
+      {PROFESSORS.length === 0 && <p className="py-6 text-center text-sm text-neutral-500">등록된 교수님이 없습니다.</p>}
       <ul className="space-y-2">
         {PROFESSORS.map((p) => (
           <li key={p.id}>

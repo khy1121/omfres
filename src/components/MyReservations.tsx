@@ -4,13 +4,15 @@ import { Icon } from "@iconify/react";
 import { useState } from "react";
 import SlotPicker from "./SlotPicker";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { getProfessor } from "@/lib/config";
+import { useProfessors } from "./ProfessorsProvider";
+import { findProfessor } from "@/lib/config";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
 type View = { kind: "lookup" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
 
 export default function MyReservations({ today }: { today: string }) {
+  const PROFESSORS = useProfessors();
   const [name, setName] = useState("");
   const [view, setView] = useState<View>({ kind: "lookup" });
   const [rows, setRows] = useState<Reservation[]>([]);
@@ -145,14 +147,14 @@ export default function MyReservations({ today }: { today: string }) {
                       <div>
                         <div className="mb-0.5 flex items-center gap-1 text-sm font-medium">
                           <Icon icon="lucide:graduation-cap" width={14} />
-                          {profName(r.professorId)}
+                          {profName(PROFESSORS, r.professorId)}
                         </div>
                         <div className="text-sm text-neutral-600">{fmtDate(r.date)}</div>
                         <div className="text-lg font-semibold tracking-tight">
-                          {fmtRange(r.professorId, r.time)}
+                          {fmtRange(PROFESSORS, r.professorId, r.time)}
                         </div>
                         {(() => {
-                          const p = getProfessor(r.professorId);
+                          const p = findProfessor(PROFESSORS, r.professorId);
                           if (!p?.office && !p?.phone) return null;
                           return (
                             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-600">
@@ -212,7 +214,7 @@ export default function MyReservations({ today }: { today: string }) {
                   {past.map((r) => (
                     <li key={r.id} className="flex justify-between rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-500">
                       <span>
-                        {profName(r.professorId)} · {fmtDate(r.date)}
+                        {profName(PROFESSORS, r.professorId)} · {fmtDate(r.date)}
                       </span>
                       <span>{r.time}</span>
                     </li>
@@ -230,12 +232,12 @@ export default function MyReservations({ today }: { today: string }) {
                 <Icon icon="lucide:loader-2" width={18} className="animate-spin" />
                 변경 중
               </p>
-            ) : !getProfessor(view.r.professorId) ? (
+            ) : !findProfessor(PROFESSORS, view.r.professorId) ? (
               <ErrorBox>교수님 정보를 찾을 수 없어 변경할 수 없습니다.</ErrorBox>
             ) : (
               <SlotPicker
                 today={today}
-                professor={getProfessor(view.r.professorId)!}
+                professor={findProfessor(PROFESSORS, view.r.professorId)!}
                 current={{ date: view.r.date, time: view.r.time }}
                 onBack={() => setView({ kind: "list" })}
                 onPick={(d, t) => move(view.r, d, t)}
@@ -249,10 +251,10 @@ export default function MyReservations({ today }: { today: string }) {
           <>
             <StepHeader title="예약을 취소할까요?" onBack={() => setView({ kind: "list" })} />
             <div className="mb-5 rounded-lg bg-neutral-100 p-4 text-sm">
-              <div className="font-semibold">{profName(view.r.professorId)}</div>
+              <div className="font-semibold">{profName(PROFESSORS, view.r.professorId)}</div>
               <div className="text-neutral-600">{fmtDate(view.r.date)}</div>
               <div className="text-base font-semibold">
-                {fmtRange(view.r.professorId, view.r.time)}
+                {fmtRange(PROFESSORS, view.r.professorId, view.r.time)}
               </div>
             </div>
             <p className="mb-5 text-sm text-neutral-600">취소한 예약은 되돌릴 수 없습니다.</p>

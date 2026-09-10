@@ -26,8 +26,10 @@ const COLUMNS = ["jeon", "jung", "choi"] as const; // 표 열 순서: 전유부,
 
 async function main() {
   // env 로드 뒤에 import 해야 getStore가 Redis를 인식
-  const { PROFESSORS, getProfessor, generateTimeSlots, isDateSelectable } = await import("../src/lib/config");
+  const { findProfessor, generateTimeSlots, isDateSelectable } = await import("../src/lib/config");
   const { getStore } = await import("../src/lib/store");
+  const PROFESSORS = await getStore().getProfessors();
+  const getProfessor = (id: unknown) => findProfessor(PROFESSORS, id);
 
   const md = readFileSync(resolve(process.cwd(), "표.md"), "utf-8");
   const section = md.split("## 전체 배정표")[1] ?? "";
