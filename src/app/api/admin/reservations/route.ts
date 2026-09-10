@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  const prof = validateProfessor(body.professorId);
+  const prof = await validateProfessor(body.professorId);
   if (!prof) return NextResponse.json({ error: "교수님을 선택해주세요." }, { status: 400 });
   const slotError = validateSlot(prof, body.date, body.time);
   if (slotError) return NextResponse.json({ error: slotError }, { status: 400 });

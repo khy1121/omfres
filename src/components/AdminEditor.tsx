@@ -5,7 +5,8 @@ import { useState } from "react";
 import ProfessorPicker from "./ProfessorPicker";
 import SlotPicker from "./SlotPicker";
 import { btnPrimary, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { getProfessor, Professor } from "@/lib/config";
+import { useProfessor, useProfessors } from "./ProfessorsProvider";
+import { Professor } from "@/lib/config";
 import { fmtDate, fmtRange } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 
@@ -27,7 +28,9 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const moveProf = mode.kind === "move" ? getProfessor(mode.r.professorId) : null;
+  const PROFESSORS = useProfessors();
+  const moveProfFound = useProfessor(mode.kind === "move" ? mode.r.professorId : "");
+  const moveProf = mode.kind === "move" ? moveProfFound : null;
 
   const submitCreate = async (date: string, time: string) => {
     if (!professor) return;
@@ -89,7 +92,7 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
             {mode.r.name} 학생 예약 옮기기
           </div>
           <div className="mt-1 text-neutral-600">
-            현재: {moveProf.name} · {fmtDate(mode.r.date)} {fmtRange(mode.r.professorId, mode.r.time)}
+            현재: {moveProf.name} · {fmtDate(mode.r.date)} {fmtRange(PROFESSORS, mode.r.professorId, mode.r.time)}
           </div>
         </div>
         <SlotPicker

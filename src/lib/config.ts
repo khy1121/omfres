@@ -1,4 +1,5 @@
-// 상담 운영 설정 — 교수님별 가능 요일/시간/슬롯 단위를 여기서 관리합니다.
+// 상담 운영 설정 — 교수님(상담자) 기본 목록과 슬롯 계산 로직.
+// 실제 목록은 저장소(Redis)에 보관되며 관리자 페이지에서 수정할 수 있습니다. 아래 목록은 초기값입니다.
 
 /** 요일별 상담 가능 시간대. days: 0=일 ... 6=토, start 이상 end 미만 시각에 상담을 시작할 수 있음 (end는 상담 종료 상한) */
 export type Availability = { days: number[]; start: string; end: string };
@@ -19,7 +20,7 @@ export type Professor = {
   office?: string;
 };
 
-export const PROFESSORS: Professor[] = [
+export const DEFAULT_PROFESSORS: Professor[] = [
   {
     id: "jeon",
     name: "전유부 교수님",
@@ -38,7 +39,7 @@ export const PROFESSORS: Professor[] = [
     onlyDates: ["2026-09-22", "2026-09-29", "2026-10-06", "2026-10-13"],
     note: "화 09:00~16:00, 30분 단위 (9/22, 9/29, 10/6, 10/13)",
     phone: "010-3456-8620",
-    office: "연구관 713호",
+    office: "연구관 901호",
   },
   {
     id: "choi",
@@ -61,8 +62,20 @@ export const CONFIG = {
   timeZone: "Asia/Seoul",
 };
 
-export function getProfessor(id: unknown): Professor | null {
-  return PROFESSORS.find((p) => p.id === id) ?? null;
+export function findProfessor(list: Professor[], id: unknown): Professor | null {
+  return list.find((p) => p.id === id) ?? null;
+}
+
+/** 요일 목록 → "월·목·금" */
+export function fmtDays(days: number[]): string {
+  const names = ["일", "월", "화", "수", "목", "금", "토"];
+  return [...days].sort().map((d) => names[d]).join("·");
+}
+
+/** availability 배열을 사람이 읽을 안내 문구로 */
+export function describeAvailability(p: Professor): string {
+  const parts = p.availability.map((a) => `${fmtDays(a.days)} ${a.start}~${a.end}`);
+  return `${parts.join(", ")}, ${p.slotMinutes}분 단위`;
 }
 
 const toMin = (t: string) => {

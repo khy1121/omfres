@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { DEFAULT_PROFESSORS, Professor } from "./config";
 
 export type Reservation = {
   id: string;
@@ -26,6 +27,9 @@ export interface Store {
   /** 관리자 PIN 해시 (없으면 null → 기본 PIN 사용) */
   getAdminPinHash(): Promise<string | null>;
   setAdminPinHash(hash: string): Promise<void>;
+  /** 교수님(상담자) 목록. 저장된 게 없으면 DEFAULT_PROFESSORS */
+  getProfessors(): Promise<Professor[]>;
+  setProfessors(list: Professor[]): Promise<void>;
 }
 
 const slotKey = (p: string, date: string, time: string) => `slot:${p}:${date}:${time}`;
@@ -34,6 +38,7 @@ const resvKey = (id: string) => `resv:${id}`;
 const nameKey = (name: string) => `name:${name}`;
 const ALL_KEY = "resv:all";
 const PIN_KEY = "admin:pin";
+const PROFS_KEY = "professors";
 
 // ── Upstash Redis (Vercel Storage에서 연결 시 자동 설정) ──
 function makeRedisStore(): Store {
@@ -100,12 +105,18 @@ function makeRedisStore(): Store {
     async setAdminPinHash(hash) {
       await redis.set(PIN_KEY, hash);
     },
+    async getProfessors() {
+      return (await redis.get<Professor[]>(PROFS_KEY)) ?? DEFAULT_PROFESSORS;
+    },
+    async setProfessors(list) {
+      await redis.set(PROFS_KEY, list);
+    },
   };
 }
 
 // ── 로컬 개발용 메모리 저장소 (서버 재시작 시 초기화) ──
 function makeMemoryStore(): Store {
-  const g = globalThis as unknown as { __resv?: Map<string, Reservation>; __pin?: string | null };
+  const g = globalThis as unknown as { __resv?: Map<string, Reservation>; __pin?: string | null; __profs?: Professor[] };
   const map = (g.__resv ??= new Map());
   const taken = (p: string, date: string, time: string, exceptId?: string) =>
     [...map.values()].some((r) => r.professorId === p && r.date === date && r.time === time && r.id !== exceptId);
@@ -141,6 +152,12 @@ function makeMemoryStore(): Store {
     },
     async setAdminPinHash(hash) {
       g.__pin = hash;
+    },
+    async getProfessors() {
+      return g.__profs ?? DEFAULT_PROFESSORS;
+    },
+    async setProfessors(list) {
+      g.__profs = list;
     },
   };
 }

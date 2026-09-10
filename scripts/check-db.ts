@@ -11,8 +11,10 @@ if (existsSync(envPath)) {
 }
 
 async function main() {
-  const { getProfessor, PROFESSORS } = await import("../src/lib/config");
+  const { findProfessor } = await import("../src/lib/config");
   const { getStore } = await import("../src/lib/store");
+  const PROFESSORS = await getStore().getProfessors();
+  const getProfessor = (id: unknown) => findProfessor(PROFESSORS, id);
   const rows = (await getStore().listAll()).sort((a, b) =>
     `${a.professorId}${a.date}${a.time}`.localeCompare(`${b.professorId}${b.date}${b.time}`),
   );

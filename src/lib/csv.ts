@@ -1,13 +1,13 @@
-import { getProfessor } from "./config";
+import { findProfessor, Professor } from "./config";
 import { addMinutes, WEEKDAYS } from "./format";
 import type { Reservation } from "./store";
 
 /** 엑셀에서 바로 열리는 CSV (UTF-8 BOM 포함) */
-export function reservationsToCsv(rows: Reservation[]): string {
+export function reservationsToCsv(profs: Professor[], rows: Reservation[]): string {
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const header = ["교수님", "날짜", "요일", "시작", "종료", "이름", "예약일시"];
   const lines = rows.map((r) => {
-    const prof = getProfessor(r.professorId);
+    const prof = findProfessor(profs, r.professorId);
     const [y, m, d] = r.date.split("-").map(Number);
     const w = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
     return [
