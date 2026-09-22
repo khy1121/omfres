@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Calendar from "./Calendar";
 import { btnPrimary, btnSecondary, ErrorBox, StepHeader } from "./ui";
-import { CONFIG, isDateSelectable, Professor } from "@/lib/config";
+import { CONFIG, dateUnavailableReason, isDateSelectable, lastBookableDate, Professor } from "@/lib/config";
 import { addMinutes, fmtDate } from "@/lib/format";
 import { canChangeReservation } from "@/lib/reservation-time";
 
-type Slot = { time: string; available: boolean };
+type Slot = { time: string; available: boolean; reason?: "past" | "booked" | null };
 export type SlotSelection = { date: string; time: string | null };
 type Props = {
   today: string;
@@ -81,8 +81,9 @@ export default function SlotPicker({ today, professor, current, selection, onSel
         {stage === "date" ? (
           <>
             <Calendar selected={date} today={today} isSelectable={(d) => isDateSelectable(professor, d, today)}
+              unavailableReason={(d) => dateUnavailableReason(professor, d, today)}
               onSelect={(d) => { choose({ date: d, time: d === date ? time : null }); setStage("time"); }} />
-            <p className="mt-4 text-xs text-neutral-500">오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다.</p>
+            <p className="mt-4 text-xs text-neutral-500">{today} ~ {lastBookableDate(today)} · 오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다. 잔여 시간은 날짜 선택 후 확인합니다.</p>
           </>
         ) : (
           <>
@@ -91,11 +92,13 @@ export default function SlotPicker({ today, professor, current, selection, onSel
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {slots.map((s) => (
                   <button key={s.time} type="button" disabled={!enabled(s)} aria-pressed={time === s.time}
+                    aria-label={enabled(s) ? s.time : `${s.time} ${s.reason === "past" ? "지난 시간" : s.reason === "booked" ? "예약 마감" : "예약 불가"}`}
                     onClick={() => date && choose({ date, time: s.time })}
                     className={`rounded-lg border py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       time === s.time ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:border-neutral-900"
                     }`}>
                     {s.time}
+                    {!enabled(s) && <span className="mt-1 block text-xs">{s.reason === "past" ? "지난 시간" : s.reason === "booked" ? "예약 마감" : "예약 불가"}</span>}
                   </button>
                 ))}
               </div>
@@ -104,7 +107,10 @@ export default function SlotPicker({ today, professor, current, selection, onSel
               <button type="button" onClick={() => setRetry((v) => v + 1)} className={btnSecondary}>다시 불러오기</button>
             </div>}
             {!loading && !loadError && slots.every((s) => !enabled(s)) && (
-              <p className="mt-4 text-sm">예약 가능한 시간이 없습니다. 다른 날짜를 선택해주세요.</p>
+              <div className="mt-4 text-sm">
+                <p role="status">{slots.length === 0 ? "등록된 상담 시간이 없습니다." : slots.every((s) => s.reason === "past") ? "오늘의 상담 시작 시간이 모두 지났습니다." : "예약 가능한 시간이 모두 마감되었습니다."}</p>
+                <button type="button" onClick={() => setStage("date")} className={`${btnSecondary} mt-3`}>다른 날짜 선택</button>
+              </div>
             )}
             {date && time && (
               <div className="mt-5 rounded-lg bg-neutral-100 p-3 text-sm" aria-live="polite">

@@ -13,6 +13,6 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { cleanup(); globalThis.fetch = originalFetch; });
 
 export async function chooseTime() {
-  fireEvent.click(screen.getByRole("button", { name: "24" }));
-  fireEvent.click(await screen.findByRole("button", { name: "10:00" }));
+  fireEvent.click(screen.getByRole("button", { name: /2099.*9.*24.*/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /^10:00/ }));
 }

@@ -15,15 +15,15 @@ test("booking preserves name and time across browser back, forward and in-app ba
   fireEvent.change(screen.getByRole("textbox", { name: "이름" }), { target: { value: "테스트" } });
   await act(async () => { window.history.back(); });
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "시작 시간을 선택하세요" })));
-  assert.equal((await screen.findByRole("button", { name: "10:00" })).getAttribute("aria-pressed"), "true");
+  assert.equal((await screen.findByRole("button", { name: /^10:00/ })).getAttribute("aria-pressed"), "true");
   await act(async () => { window.history.forward(); });
   await waitFor(() => assert.equal((screen.getByRole("textbox", { name: "이름" }) as HTMLInputElement).value, "테스트"));
   fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "시작 시간을 선택하세요" })));
   fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
   await waitFor(() => assert.ok(screen.getByRole("heading", { name: "상담 날짜를 선택하세요" })));
-  fireEvent.click(screen.getByRole("button", { name: "24" }));
-  assert.equal((await screen.findByRole("button", { name: "10:00" })).getAttribute("aria-pressed"), "true");
+  fireEvent.click(screen.getByRole("button", { name: /2099.*9.*24.*/ }));
+  assert.equal((await screen.findByRole("button", { name: /^10:00/ })).getAttribute("aria-pressed"), "true");
 });
 
 test("changing professor retains a still-valid date and time", async () => {
@@ -35,8 +35,8 @@ test("changing professor retains a still-valid date and time", async () => {
   await screen.findByRole("heading", { name: "상담 날짜를 선택하세요" });
   fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
   fireEvent.click(await screen.findByRole("button", { name: /다른 교수님/ }));
-  fireEvent.click(screen.getByRole("button", { name: "24" }));
-  assert.equal((await screen.findByRole("button", { name: "10:00" })).getAttribute("aria-pressed"), "true");
+  fireEvent.click(screen.getByRole("button", { name: /2099.*9.*24.*/ }));
+  assert.equal((await screen.findByRole("button", { name: /^10:00/ })).getAttribute("aria-pressed"), "true");
 });
 
 test("browser Back during a pending save does not destroy the time-step history", async () => {

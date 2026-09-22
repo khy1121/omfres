@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "예약할 수 없는 날짜입니다." }, { status: 400 });
   }
   const booked = new Set(await getStore().bookedTimes(prof.id, date));
-  const now = date === todayKST() ? nowTimeKST() : "00:00";
-  const slots = generateTimeSlots(prof, date).map((time) => ({
-    time,
-    available: !booked.has(time) && time > now,
-  }));
+  const now = date === todayKST() ? nowTimeKST() : "";
+  const slots = generateTimeSlots(prof, date).map((time) => {
+    const reason = time <= now ? "past" : booked.has(time) ? "booked" : null;
+    return { time, available: reason === null, reason };
+  });
   return NextResponse.json({ professor: prof.id, date, slotMinutes: prof.slotMinutes, slots });
 }
