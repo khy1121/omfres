@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdmin } from "@/lib/admin";
 import { getStore } from "@/lib/store";
 import { validateProfessor, validateSlot } from "@/lib/validate";
+import { canChangeReservation } from "@/lib/reservation-time";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const store = getStore();
   const r = await store.get(id);
   if (!r) return NextResponse.json({ error: "예약을 찾을 수 없습니다." }, { status: 404 });
+  if (!canChangeReservation(r)) return NextResponse.json({ error: "상담 시작 시간이 지나 이동할 수 없습니다." }, { status: 400 });
   const prof = await validateProfessor(r.professorId);
   if (!prof) return NextResponse.json({ error: "교수님 정보를 찾을 수 없습니다." }, { status: 400 });
   const slotError = validateSlot(prof, body.date, body.time);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 import { validateName, validateProfessor, validateSlot } from "@/lib/validate";
+import { canChangeReservation } from "@/lib/reservation-time";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const auth = await authorize(id, body.name);
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+  if (!canChangeReservation(auth.reservation)) return NextResponse.json({ error: "상담 시작 시간이 지나 변경할 수 없습니다." }, { status: 400 });
+
   const prof = await validateProfessor(auth.reservation.professorId);
   if (!prof) return NextResponse.json({ error: "교수님 정보를 찾을 수 없습니다." }, { status: 400 });
   const slotError = validateSlot(prof, body.date, body.time);
@@ -50,6 +53,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   const sp = req.nextUrl.searchParams;
   const auth = await authorize(id, sp.get("name"));
   if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if (!canChangeReservation(auth.reservation)) return NextResponse.json({ error: "상담 시작 시간이 지나 취소할 수 없습니다." }, { status: 400 });
   await getStore().remove(id);
   return NextResponse.json({ ok: true });
 }
