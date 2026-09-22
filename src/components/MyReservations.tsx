@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import SlotPicker from "./SlotPicker";
-import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
+import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, successCls, Field, inputCls, StepHeader } from "./ui";
 import { useProfessors, useReservationLookup } from "./ProfessorsProvider";
 import { findProfessor } from "@/lib/config";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
@@ -142,7 +142,7 @@ export default function MyReservations({ today, initialNow }: { today: string; i
               {name}
             </p>
             {notice && (
-              <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+              <div role="status" className={successCls}>
                 <Icon icon="lucide:check-circle" width={18} />
                 {notice}
               </div>
@@ -289,7 +289,7 @@ export default function MyReservations({ today, initialNow }: { today: string; i
               <button type="button" onClick={() => setView({ kind: "list" })} className={`${btnSecondary} flex-1`}>
                 돌아가기
               </button>
-              <button type="button" disabled={busy || !canChangeReservation(view.r, now)} onClick={() => cancel(view.r)} className={`${btnPrimary} flex-1`}>
+              <button type="button" disabled={busy || !canChangeReservation(view.r, now)} onClick={() => cancel(view.r)} className={`${btnDanger} flex-1`}>
                 <Icon icon={busy ? "lucide:loader-2" : "lucide:trash-2"} width={16} className={busy ? "animate-spin" : ""} />
                 예약 취소
               </button>

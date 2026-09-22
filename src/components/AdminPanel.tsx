@@ -6,7 +6,7 @@ import AdminCalendar, { profStyle } from "./AdminCalendar";
 import AdminEditor, { EditorMode } from "./AdminEditor";
 import ProfessorManager from "./ProfessorManager";
 import { useProfessors } from "./ProfessorsProvider";
-import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
+import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, successCls, Field, inputCls, StepHeader } from "./ui";
 import { downloadCsv, reservationsToCsv } from "@/lib/csv";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
@@ -237,7 +237,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             <button type="button" onClick={() => setConfirmId(null)} className={`${btnSecondary} px-3 py-1.5`}>
               아니오
             </button>
-            <button type="button" disabled={busy} onClick={() => remove(r.id)} className={`${btnPrimary} px-3 py-1.5`}>
+            <button type="button" disabled={busy} onClick={() => remove(r.id)} className={`${btnDanger} px-3 py-1.5`}>
               삭제
             </button>
           </div>
@@ -250,7 +250,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
                   setNotice(null);
                   setEditor({ kind: "move", r });
                 }}
-                className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
                 aria-label="예약 옮기기"
                 title="옮기기"
               >
@@ -260,7 +260,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             <button
               type="button"
               onClick={() => setConfirmId(r.id)}
-              className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+              className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
               aria-label="예약 삭제"
               title="삭제"
             >
@@ -348,7 +348,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
         {listError && <ErrorBox>{listError}</ErrorBox>}
         {(tab === "all" || tab === "student") && <p role="status" className="mb-4 text-sm text-neutral-600">현재 결과 {currentResults.length}건 · {resultScope} · {showPast ? "지난 예약 포함" : "지난 예약 제외"}. 전체 CSV는 모든 예약 {rows.length}건을 포함합니다.</p>}
         {notice && (
-          <div role="status" className="mb-4 flex items-start gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+          <div role="status" className={successCls}>
             <Icon icon="lucide:check-circle" width={18} className="mt-0.5 shrink-0" />
             <span className="flex-1">{notice}</span>
             <button type="button" onClick={() => setNotice(null)} className="shrink-0 opacity-70 hover:opacity-100" aria-label="닫기">
@@ -488,7 +488,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             </Field>
             {pinMsg && (
               pinMsg.ok ? (
-                <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+                <div role="status" className={successCls}>
                   <Icon icon="lucide:check-circle" width={18} />
                   {pinMsg.text}
                 </div>
@@ -499,7 +499,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             <button
               type="submit"
               disabled={busy || curPin.length !== 6 || newPin.length !== 6 || newPin2.length !== 6}
-              className={`${btnDanger} w-full`}
+              className={`${btnPrimary} w-full`}
             >
               <Icon icon="lucide:save" width={16} />
               PIN 변경
