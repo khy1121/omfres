@@ -277,6 +277,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
+              disabled={editor !== null}
               className={[
                 "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition",
                 tab === t.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100",
@@ -290,6 +291,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
+            disabled={editor !== null}
             onClick={() => {
               setNotice(null);
               setEditor({ kind: "create" });
@@ -299,14 +301,14 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             <Icon icon="lucide:plus" width={16} />
             예약 추가
           </button>
-          <button type="button" onClick={exportCsv} disabled={rows.length === 0} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`} title="엑셀(CSV)로 내려받기">
+          <button type="button" onClick={exportCsv} disabled={rows.length === 0 || editor !== null} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`} title="엑셀(CSV)로 내려받기">
             <Icon icon="lucide:download" width={16} />
             CSV
           </button>
-          <button type="button" onClick={load} className={`${btnSecondary} px-3 py-1.5`} aria-label="새로고침">
+          <button type="button" onClick={load} disabled={editor !== null} className={`${btnSecondary} px-3 py-1.5`} aria-label="새로고침">
             <Icon icon="lucide:refresh-cw" width={16} className={loading ? "animate-spin" : ""} />
           </button>
-          <button type="button" onClick={logout} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`}>
+          <button type="button" onClick={logout} disabled={editor !== null} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`}>
             <Icon icon="lucide:log-out" width={16} />
             로그아웃
           </button>

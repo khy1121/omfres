@@ -4,62 +4,39 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useState } from "react";
 import ProfessorPicker from "./ProfessorPicker";
-import SlotPicker from "./SlotPicker";
+import SlotPicker, { SlotSelection } from "./SlotPicker";
+import { useReservationSave } from "./useReservationSave";
+import ReservationRecovery from "./ReservationRecovery";
 import { btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { Professor } from "@/lib/config";
+import { generateTimeSlots, isDateSelectable, Professor } from "@/lib/config";
 import { addMinutes, fmtDate } from "@/lib/format";
 
 type Step = 1 | 2 | 3 | 4;
 
 export default function BookingFlow({ today }: { today: string }) {
-  const [step, setStep] = useState<Step>(1);
-  const [pickerKey, setPickerKey] = useState(0);
   const [professor, setProfessor] = useState<Professor | null>(null);
-  const [date, setDate] = useState<string | null>(null);
-  const [time, setTime] = useState<string | null>(null);
+  const [selection, setSelection] = useState<SlotSelection | null>(null);
+  const date = selection?.date ?? null;
+  const time = selection?.time ?? null;
   const [name, setName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>(1);
+  const [slotStage, setSlotStage] = useState<"date" | "time">("date");
+  const mutation = useReservationSave(() => setStep(4), undefined, () => { setStep(2); setSlotStage("time"); });
 
   const submit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/reservations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ professorId: professor?.id, date, time, name }),
-      });
-      const j = await res.json();
-      if (!res.ok) {
-        if (res.status === 409) {
-          setConflict(j.error);
-          setPickerKey((k) => k + 1);
-          setStep(2);
-        } else {
-          setError(j.error ?? "예약에 실패했습니다.");
-        }
-        return;
-      }
-      setStep(4);
-    } catch {
-      setError("네트워크 오류가 발생했습니다.");
-    } finally {
-      setSubmitting(false);
-    }
+    if (!professor || !date || !time) return;
+    const expected = { professorId: professor.id, date, time, name: name.trim() };
+    await mutation.save({ url: "/api/reservations", method: "POST", body: expected,
+      lookupUrl: `/api/reservations?name=${encodeURIComponent(name.trim())}`, expected });
   };
 
   const reset = () => {
     setStep(1);
-    setPickerKey((k) => k + 1);
+    setSlotStage("date");
     setProfessor(null);
-    setDate(null);
-    setTime(null);
+    setSelection(null);
     setName("");
-    setError(null);
-    setConflict(null);
   };
 
   const steps = [
@@ -109,14 +86,19 @@ export default function BookingFlow({ today }: { today: string }) {
       </ol>
 
       <Card>
+        {step !== 4 && mutation.error && <ErrorBox>{mutation.error}</ErrorBox>}
+        <ReservationRecovery mutation={mutation} />
         {step === 1 && (
           <ProfessorPicker
             onPick={(p) => {
+              if (professor?.id !== p.id && selection) {
+                setSelection(isDateSelectable(p, selection.date, today) ? {
+                  date: selection.date,
+                  time: selection.time && generateTimeSlots(p, selection.date).includes(selection.time) ? selection.time : null,
+                } : null);
+              }
               setProfessor(p);
-              setDate(null);
-              setTime(null);
-              setConflict(null);
-              setPickerKey((k) => k + 1);
+              setSlotStage("date");
               setStep(2);
             }}
           />
@@ -124,22 +106,24 @@ export default function BookingFlow({ today }: { today: string }) {
 
         {step === 2 && professor && (
           <SlotPicker
-            key={pickerKey}
+            key={professor.id}
             today={today}
             professor={professor}
-            error={conflict}
+            selection={selection}
+            onSelectionChange={setSelection}
+            stage={slotStage}
+            onStageChange={setSlotStage}
+            refreshVersion={mutation.refreshVersion}
+            busy={mutation.busy}
+            blocked={mutation.pending}
             onBack={() => setStep(1)}
-            onPick={(d, t) => {
-              setDate(d);
-              setTime(t);
-              setConflict(null);
-              setStep(3);
-            }}
+            onPick={() => setStep(3)}
           />
         )}
 
         {step === 3 && professor && date && time && (
           <form onSubmit={submit}>
+            <fieldset disabled={mutation.busy || mutation.pending} className="min-w-0">
             <StepHeader title="정보를 입력하세요" onBack={() => setStep(2)} />
             {summary}
             <Field label="이름" icon="lucide:user">
@@ -153,11 +137,12 @@ export default function BookingFlow({ today }: { today: string }) {
                 className={inputCls}
               />
             </Field>
-            {error && <ErrorBox>{error}</ErrorBox>}
-            <button type="submit" disabled={submitting} className={`${btnPrimary} w-full`}>
-              <Icon icon={submitting ? "lucide:loader-2" : "lucide:check"} width={18} className={submitting ? "animate-spin" : ""} />
-              {submitting ? "예약 중" : "예약하기"}
+            {mutation.error && !mutation.pending && <button type="button" onClick={() => setStep(2)} className={`${btnSecondary} mb-3 w-full`}>다른 시간 선택</button>}
+            <button type="submit" disabled={mutation.busy || mutation.pending} className={`${btnPrimary} w-full`}>
+              <Icon icon={mutation.busy ? "lucide:loader-2" : "lucide:check"} width={18} className={mutation.busy ? "animate-spin" : ""} />
+              {mutation.busy ? "예약 중" : "예약하기"}
             </button>
+            </fieldset>
           </form>
         )}
 

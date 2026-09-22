@@ -10,6 +10,8 @@ import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
 import { canChangeReservation, reservationStatus, reservationStatusLabel } from "@/lib/reservation-time";
 import { useNow } from "./useNow";
+import { useReservationSave } from "./useReservationSave";
+import ReservationRecovery from "./ReservationRecovery";
 
 type View = { kind: "lookup" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
 
@@ -22,6 +24,11 @@ export default function MyReservations({ today, initialNow }: { today: string; i
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const mutation = useReservationSave((updated) => {
+    setRows((rows) => rows.map((r) => r.id === updated.id ? updated : r));
+    setNotice("예약이 변경되었습니다.");
+    setView({ kind: "list" });
+  });
 
   const query = () => `name=${encodeURIComponent(name)}`;
 
@@ -47,24 +54,10 @@ export default function MyReservations({ today, initialNow }: { today: string; i
   };
 
   const move = async (r: Reservation, date: string, time: string) => {
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/reservations/${r.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, date, time }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error);
-      await load();
-      setNotice("예약이 변경되었습니다.");
-      setView({ kind: "list" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "변경에 실패했습니다.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.save({
+      url: `/api/reservations/${r.id}`, method: "PATCH", body: { name, date, time },
+      lookupUrl: `/api/reservations?${query()}`, expected: { ...r, date, time },
+    });
   };
 
   const cancel = async (r: Reservation) => {
@@ -232,14 +225,8 @@ export default function MyReservations({ today, initialNow }: { today: string; i
 
         {view.kind === "edit" && (
           <>
-            {busy ? (
-              <p className="flex items-center justify-center gap-2 py-10 text-sm text-neutral-500">
-                <Icon icon="lucide:loader-2" width={18} className="animate-spin" />
-                변경 중
-              </p>
-            ) : !canChangeReservation(view.r, now) ? (
-              <><ErrorBox>상담 시작 시간이 지나 변경할 수 없습니다.</ErrorBox><button type="button" onClick={() => setView({ kind: "list" })} className={btnSecondary}>목록으로 돌아가기</button></>
-            ) : !findProfessor(PROFESSORS, view.r.professorId) ? (
+            <p className="mb-3 text-sm">예약자: {name}</p>
+            {!findProfessor(PROFESSORS, view.r.professorId) ? (
               <ErrorBox>교수님 정보를 찾을 수 없어 변경할 수 없습니다.</ErrorBox>
             ) : (
               <SlotPicker
@@ -248,9 +235,16 @@ export default function MyReservations({ today, initialNow }: { today: string; i
                 current={{ date: view.r.date, time: view.r.time }}
                 onBack={() => setView({ kind: "list" })}
                 onPick={(d, t) => move(view.r, d, t)}
-                error={error}
+                error={mutation.error}
+                busy={mutation.busy}
+                blocked={mutation.pending || !canChangeReservation(view.r, now)}
+                refreshVersion={mutation.refreshVersion}
+                confirmLabel="이 일정으로 변경"
               />
             )}
+            {!canChangeReservation(view.r, now) && <ErrorBox>상담 시작 시간이 지나 변경할 수 없습니다.</ErrorBox>}
+            <ReservationRecovery mutation={mutation} />
+            {!mutation.pending && !canChangeReservation(view.r, now) && <button type="button" onClick={() => setView({ kind: "list" })} className={btnSecondary}>목록으로 돌아가기</button>}
           </>
         )}
 
