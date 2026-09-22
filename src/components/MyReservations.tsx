@@ -1,10 +1,11 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import SlotPicker from "./SlotPicker";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
-import { useProfessors } from "./ProfessorsProvider";
+import { useProfessors, useReservationLookup } from "./ProfessorsProvider";
 import { findProfessor } from "@/lib/config";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
@@ -13,17 +14,35 @@ import { useNow } from "./useNow";
 import { useReservationSave } from "./useReservationSave";
 import ReservationRecovery from "./ReservationRecovery";
 
-type View = { kind: "lookup" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
+type View = { kind: "lookup" } | { kind: "loading" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
 
 export default function MyReservations({ today, initialNow }: { today: string; initialNow: number }) {
   const PROFESSORS = useProfessors();
   const now = useNow(initialNow);
-  const [name, setName] = useState("");
-  const [view, setView] = useState<View>({ kind: "lookup" });
+  const lookupSession = useReservationLookup();
+  const [initialName] = useState(lookupSession.name);
+  const [name, setName] = useState(initialName);
+  const [view, setView] = useState<View>({ kind: initialName ? "loading" : "lookup" });
   const [rows, setRows] = useState<Reservation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!initialName) return;
+    const controller = new AbortController();
+    let active = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/reservations?name=${encodeURIComponent(initialName)}`, { cache: "no-store", signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "조회에 실패했습니다.");
+        if (active) { setRows(data.reservations ?? []); setView({ kind: "list" }); }
+      } catch (err) {
+        if (active) { setError(err instanceof Error ? err.message : "조회에 실패했습니다."); setView({ kind: "lookup" }); }
+      }
+    })();
+    return () => { active = false; controller.abort(); };
+  }, [initialName]);
   const mutation = useReservationSave((updated) => {
     setRows((rows) => rows.map((r) => r.id === updated.id ? updated : r));
     setNotice("예약이 변경되었습니다.");
@@ -85,6 +104,7 @@ export default function MyReservations({ today, initialNow }: { today: string; i
   return (
     <div className="mx-auto w-full max-w-md">
       <Card>
+        {view.kind === "loading" && <p role="status">예약을 확인하는 중입니다.</p>}
         {view.kind === "lookup" && (
           <form onSubmit={lookup}>
             <StepHeader title="예약 조회" />
@@ -122,7 +142,7 @@ export default function MyReservations({ today, initialNow }: { today: string; i
               {name}
             </p>
             {notice && (
-              <div className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+              <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
                 <Icon icon="lucide:check-circle" width={18} />
                 {notice}
               </div>
@@ -133,6 +153,10 @@ export default function MyReservations({ today, initialNow }: { today: string; i
               <div className="py-10 text-center text-sm text-neutral-500">
                 <Icon icon="lucide:calendar-x" width={36} className="mx-auto mb-2 text-neutral-300" />
                 예약 내역이 없습니다.
+                <div className="mt-4 flex justify-center gap-2">
+                  <button type="button" onClick={() => setView({ kind: "lookup" })} className={btnSecondary}>이름 다시 확인</button>
+                  <Link href="/" className={btnPrimary}>새 예약하기</Link>
+                </div>
               </div>
             )}
 
