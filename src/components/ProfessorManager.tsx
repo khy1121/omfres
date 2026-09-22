@@ -4,7 +4,10 @@ import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useProfessors } from "./ProfessorsProvider";
-import { btnDanger, btnPrimary, btnSecondary, ErrorBox, Field, inputCls } from "./ui";
+import { btnPrimary, btnSecondary, ErrorBox, Field, inputCls, StepHeader } from "./ui";
+import DateListInput from "./DateListInput";
+import { validateProfessorInput } from "@/lib/professor-input";
+import { scheduleImpact } from "@/lib/schedule-impact";
 import { describeAvailability, Professor } from "@/lib/config";
 import type { Reservation } from "@/lib/store";
 import { canChangeReservation } from "@/lib/reservation-time";
@@ -61,10 +64,12 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ prof: Professor; impact: ReturnType<typeof scheduleImpact> } | null>(null);
 
   const upcomingCount = (id: string) => rows.filter((r) => r.professorId === id && canChangeReservation(r, now)).length;
 
   const open = (m: Mode) => {
+    setPreview(null);
     setError(null);
     setNotice(null);
     setConfirmId(null);
@@ -97,7 +102,6 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
   const submit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (mode.kind === "list") return;
-    setBusy(true);
     setError(null);
     const payload = {
       name: form.name,
@@ -109,21 +113,30 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
       phone: form.phone,
       office: form.office,
     };
+    const validated = validateProfessorInput(mode.kind === "edit" ? mode.p.id : "new", payload);
+    if ("error" in validated) { setError(validated.error); return; }
+    if (mode.kind === "create") { await persist(validated.prof); return; }
+    setBusy(true);
     try {
-      if (mode.kind === "create") {
-        await request("/api/admin/professors", "POST", payload);
-        setNotice(`${form.name.trim()}을(를) 추가했습니다.`);
-      } else {
-        await request(`/api/admin/professors/${mode.p.id}`, "PUT", payload);
-        setNotice(`${form.name.trim()} 정보를 저장했습니다.`);
-      }
-      setMode({ kind: "list" });
-      router.refresh();
+      const latest = await request("/api/admin/reservations", "GET");
+      setPreview({ prof: validated.prof, impact: scheduleImpact(mode.p, validated.prof, latest.reservations ?? [], now) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const persist = async (prof: Professor) => {
+    if (mode.kind === "list" || busy) return;
+    setBusy(true); setError(null);
+    try {
+      await request(mode.kind === "create" ? "/api/admin/professors" : `/api/admin/professors/${mode.p.id}`,
+        mode.kind === "create" ? "POST" : "PUT", prof);
+      setNotice(`${prof.name} 정보를 저장했습니다.`);
+      setPreview(null); setMode({ kind: "list" }); router.refresh();
+    } catch (err) { setError(err instanceof Error ? err.message : "저장에 실패했습니다."); }
+    finally { setBusy(false); }
   };
 
   const remove = async (p: Professor) => {
@@ -156,7 +169,7 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
         </div>
         {error && <ErrorBox>{error}</ErrorBox>}
         {notice && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+          <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
             <Icon icon="lucide:check-circle" width={18} />
             <span className="flex-1">{notice}</span>
             <button type="button" onClick={() => setNotice(null)} className="opacity-70 hover:opacity-100" aria-label="닫기">
@@ -262,10 +275,28 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
   }
 
   // ── 추가 / 수정 폼 ──
+  if (preview) return <div className="mx-auto max-w-lg">
+    <StepHeader title="일정 변경 영향 확인" />
+    <p className="mb-3 text-sm">{preview.prof.name} · {describeAvailability(preview.prof)}</p>
+    <p role="status" className="mb-3 font-semibold">영향을 받는 예약 {preview.impact.length}건 (예정·진행 상태 기준)</p>
+    <p className="mb-4 text-sm text-neutral-600">예약 날짜와 시작 시간은 그대로 유지됩니다. 상담 시간 변경은 기존 예약의 종료 시각 표시에도 적용됩니다. 새 일정 밖에 남는 예약은 학생에게 안내하고 별도로 조정해주세요.</p>
+    <ul className="mb-4 max-h-64 space-y-2 overflow-y-auto">
+      {preview.impact.map(({reservation:r, reasons}) => <li key={r.id} className="rounded-lg border border-neutral-200 p-3 text-sm">
+        <p className="font-semibold">{r.date} {r.time} · {r.name}</p><p>{reasons.join(" · ")}</p>
+      </li>)}
+    </ul>
+    <p className="mb-4 text-xs text-neutral-500">방금 조회한 예약 기준입니다. 확인 중 새로 접수된 예약은 포함되지 않을 수 있습니다.</p>
+    {error && <ErrorBox>{error}</ErrorBox>}
+    <div className="flex gap-2">
+      <button type="button" disabled={busy} onClick={() => { setPreview(null); setError(null); }} className={`${btnSecondary} flex-1`}>수정으로 돌아가기</button>
+      <button type="button" disabled={busy} onClick={() => persist(preview.prof)} className={`${btnPrimary} flex-1`}>{busy ? "저장 중" : "영향 확인 후 저장"}</button>
+    </div>
+  </div>;
   const dayUsedElsewhere = (i: number, d: number) => form.availability.some((a, j) => j !== i && a.days.includes(d));
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-lg">
+      <fieldset disabled={busy} className="min-w-0">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-bold tracking-tight">{mode.kind === "create" ? "상담자 추가" : `${mode.p.name} 수정`}</h2>
         <button
@@ -317,6 +348,8 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
                       type="button"
                       disabled={taken}
                       onClick={() => toggleDay(i, d)}
+                      aria-pressed={on}
+                      aria-label={`${nm}요일${taken ? ", 다른 시간대에서 사용 중" : ""}`}
                       className={[
                         "h-8 w-8 rounded-full border text-sm transition",
                         on ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
@@ -330,9 +363,9 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
                 })}
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <input type="time" value={a.start} step={300} onChange={(e) => patchAvail(i, { start: e.target.value })} required className={`${smallInput} w-auto`} />
+                <input aria-label={`${i + 1}번째 시간대 시작`} type="time" value={a.start} step={300} onChange={(e) => patchAvail(i, { start: e.target.value })} required className={`${smallInput} w-auto`} />
                 <span className="text-neutral-400">~</span>
-                <input type="time" value={a.end} step={300} onChange={(e) => patchAvail(i, { end: e.target.value })} required className={`${smallInput} w-auto`} />
+                <input aria-label={`${i + 1}번째 시간대 종료`} type="time" value={a.end} step={300} onChange={(e) => patchAvail(i, { end: e.target.value })} required className={`${smallInput} w-auto`} />
                 {form.availability.length > 1 && (
                   <button
                     type="button"
@@ -359,15 +392,11 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
       </div>
 
       <div className="grid gap-x-3 sm:grid-cols-2">
-        <Field label="예약 불가 날짜 (선택)" icon="lucide:calendar-x">
-          <textarea value={form.excludeDates} onChange={(e) => patch({ excludeDates: e.target.value })} rows={3} placeholder={"2026-09-21\n2026-10-15"} className={`${inputCls} font-mono text-sm`} />
-        </Field>
-        <Field label="지정 날짜만 허용 (선택)" icon="lucide:calendar-check">
-          <textarea value={form.onlyDates} onChange={(e) => patch({ onlyDates: e.target.value })} rows={3} placeholder={"2026-09-22\n2026-09-29"} className={`${inputCls} font-mono text-sm`} />
-        </Field>
+        <DateListInput label="예약 불가 날짜 (선택)" value={form.excludeDates} onChange={(value) => patch({ excludeDates: value })} />
+        <DateListInput label="지정 날짜만 허용 (선택)" value={form.onlyDates} onChange={(value) => patch({ onlyDates: value })} />
       </div>
       <p className="-mt-2 mb-4 text-xs text-neutral-500">
-        날짜는 YYYY-MM-DD 형식으로 한 줄에 하나씩 입력합니다. 지정 날짜를 입력하면 그 날짜 중 상담 가능 요일에 해당하는 날만 예약할 수 있습니다.
+        날짜를 선택한 뒤 추가해주세요. 지정 날짜를 추가하면 그 날짜 중 상담 가능 요일에 해당하는 날만 예약할 수 있습니다.
       </p>
 
       {error && <ErrorBox>{error}</ErrorBox>}
@@ -375,11 +404,12 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
         <button type="button" onClick={() => setMode({ kind: "list" })} className={`${btnSecondary} flex-1`}>
           취소
         </button>
-        <button type="submit" disabled={busy} className={`${mode.kind === "edit" ? btnDanger : btnPrimary} flex-1`}>
+        <button type="submit" disabled={busy} className={`${btnPrimary} flex-1`}>
           <Icon icon={busy ? "lucide:loader-2" : "lucide:save"} width={16} className={busy ? "animate-spin" : ""} />
-          {mode.kind === "create" ? "추가" : "저장"}
+          {mode.kind === "create" ? "추가" : "변경 영향 확인"}
         </button>
       </div>
+      </fieldset>
     </form>
   );
 }
