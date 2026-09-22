@@ -16,4 +16,3 @@ export async function chooseTime() {
   fireEvent.click(screen.getByRole("button", { name: "24" }));
   fireEvent.click(await screen.findByRole("button", { name: "10:00" }));
 }
-

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import ProfessorPicker from "./ProfessorPicker";
 import SlotPicker, { SlotSelection } from "./SlotPicker";
+import { useBookingNavigation } from "./useBookingNavigation";
 import { useReservationSave } from "./useReservationSave";
 import ReservationRecovery from "./ReservationRecovery";
 import { btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
@@ -19,9 +20,9 @@ export default function BookingFlow({ today }: { today: string }) {
   const date = selection?.date ?? null;
   const time = selection?.time ?? null;
   const [name, setName] = useState("");
-  const [step, setStep] = useState<Step>(1);
-  const [slotStage, setSlotStage] = useState<"date" | "time">("date");
-  const mutation = useReservationSave(() => setStep(4), undefined, () => { setStep(2); setSlotStage("time"); });
+  const navigation = useBookingNavigation();
+  const mutation = useReservationSave(() => navigation.finish(), navigation.setBlocked, () => navigation.back(2, "time"));
+  const step = !professor && navigation.step !== 4 ? 1 : navigation.step === 3 && (!date || !time) ? 2 : navigation.step;
 
   const submit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -32,8 +33,7 @@ export default function BookingFlow({ today }: { today: string }) {
   };
 
   const reset = () => {
-    setStep(1);
-    setSlotStage("date");
+    navigation.reset();
     setProfessor(null);
     setSelection(null);
     setName("");
@@ -98,8 +98,7 @@ export default function BookingFlow({ today }: { today: string }) {
                 } : null);
               }
               setProfessor(p);
-              setSlotStage("date");
-              setStep(2);
+              navigation.go(2);
             }}
           />
         )}
@@ -111,20 +110,20 @@ export default function BookingFlow({ today }: { today: string }) {
             professor={professor}
             selection={selection}
             onSelectionChange={setSelection}
-            stage={slotStage}
-            onStageChange={setSlotStage}
+            stage={navigation.stage}
+            onStageChange={(stage) => stage === "date" ? navigation.back(2) : navigation.go(2, "time")}
             refreshVersion={mutation.refreshVersion}
             busy={mutation.busy}
             blocked={mutation.pending}
-            onBack={() => setStep(1)}
-            onPick={() => setStep(3)}
+            onBack={() => navigation.back(1)}
+            onPick={() => navigation.go(3)}
           />
         )}
 
         {step === 3 && professor && date && time && (
           <form onSubmit={submit}>
             <fieldset disabled={mutation.busy || mutation.pending} className="min-w-0">
-            <StepHeader title="정보를 입력하세요" onBack={() => setStep(2)} />
+            <StepHeader title="정보를 입력하세요" onBack={() => navigation.back(2, "time")} />
             {summary}
             <Field label="이름" icon="lucide:user">
               <input
@@ -137,7 +136,7 @@ export default function BookingFlow({ today }: { today: string }) {
                 className={inputCls}
               />
             </Field>
-            {mutation.error && !mutation.pending && <button type="button" onClick={() => setStep(2)} className={`${btnSecondary} mb-3 w-full`}>다른 시간 선택</button>}
+            {mutation.error && !mutation.pending && <button type="button" onClick={() => navigation.back(2, "time")} className={`${btnSecondary} mb-3 w-full`}>다른 시간 선택</button>}
             <button type="submit" disabled={mutation.busy || mutation.pending} className={`${btnPrimary} w-full`}>
               <Icon icon={mutation.busy ? "lucide:loader-2" : "lucide:check"} width={18} className={mutation.busy ? "animate-spin" : ""} />
               {mutation.busy ? "예약 중" : "예약하기"}
