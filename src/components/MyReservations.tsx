@@ -8,11 +8,14 @@ import { useProfessors } from "./ProfessorsProvider";
 import { findProfessor } from "@/lib/config";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
+import { canChangeReservation, reservationStatus, reservationStatusLabel } from "@/lib/reservation-time";
+import { useNow } from "./useNow";
 
 type View = { kind: "lookup" } | { kind: "list" } | { kind: "edit"; r: Reservation } | { kind: "cancel"; r: Reservation };
 
-export default function MyReservations({ today }: { today: string }) {
+export default function MyReservations({ today, initialNow }: { today: string; initialNow: number }) {
   const PROFESSORS = useProfessors();
+  const now = useNow(initialNow);
   const [name, setName] = useState("");
   const [view, setView] = useState<View>({ kind: "lookup" });
   const [rows, setRows] = useState<Reservation[]>([]);
@@ -81,7 +84,8 @@ export default function MyReservations({ today }: { today: string }) {
     }
   };
 
-  const isPast = (r: Reservation) => r.date < today;
+  const status = (r: Reservation) => reservationStatus(r, findProfessor(PROFESSORS, r.professorId)?.slotMinutes, now);
+  const isPast = (r: Reservation) => ["elapsed", "unknown"].includes(status(r));
   const upcoming = rows.filter((r) => !isPast(r));
   const past = rows.filter(isPast);
 
@@ -153,6 +157,7 @@ export default function MyReservations({ today }: { today: string }) {
                         <div className="text-lg font-semibold tracking-tight">
                           {fmtRange(PROFESSORS, r.professorId, r.time)}
                         </div>
+                        <p className="mt-1 text-xs text-neutral-500">{reservationStatusLabel[status(r)]}</p>
                         {(() => {
                           const p = findProfessor(PROFESSORS, r.professorId);
                           if (!p?.office && !p?.phone) return null;
@@ -176,7 +181,7 @@ export default function MyReservations({ today }: { today: string }) {
                       </div>
                       <Icon icon="lucide:calendar-check" width={22} className="shrink-0 text-neutral-400" />
                     </div>
-                    <div className="mt-3 flex gap-2">
+                    {canChangeReservation(r, now) && <div className="mt-3 flex gap-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -201,7 +206,7 @@ export default function MyReservations({ today }: { today: string }) {
                         <Icon icon="lucide:trash-2" width={15} />
                         취소
                       </button>
-                    </div>
+                    </div>}
                   </li>
                 ))}
               </ul>
@@ -232,6 +237,8 @@ export default function MyReservations({ today }: { today: string }) {
                 <Icon icon="lucide:loader-2" width={18} className="animate-spin" />
                 변경 중
               </p>
+            ) : !canChangeReservation(view.r, now) ? (
+              <><ErrorBox>상담 시작 시간이 지나 변경할 수 없습니다.</ErrorBox><button type="button" onClick={() => setView({ kind: "list" })} className={btnSecondary}>목록으로 돌아가기</button></>
             ) : !findProfessor(PROFESSORS, view.r.professorId) ? (
               <ErrorBox>교수님 정보를 찾을 수 없어 변경할 수 없습니다.</ErrorBox>
             ) : (
@@ -258,12 +265,13 @@ export default function MyReservations({ today }: { today: string }) {
               </div>
             </div>
             <p className="mb-5 text-sm text-neutral-600">취소한 예약은 되돌릴 수 없습니다.</p>
+            {!canChangeReservation(view.r, now) && <ErrorBox>상담 시작 시간이 지나 취소할 수 없습니다.</ErrorBox>}
             {error && <ErrorBox>{error}</ErrorBox>}
             <div className="flex gap-2">
               <button type="button" onClick={() => setView({ kind: "list" })} className={`${btnSecondary} flex-1`}>
                 돌아가기
               </button>
-              <button type="button" disabled={busy} onClick={() => cancel(view.r)} className={`${btnPrimary} flex-1`}>
+              <button type="button" disabled={busy || !canChangeReservation(view.r, now)} onClick={() => cancel(view.r)} className={`${btnPrimary} flex-1`}>
                 <Icon icon={busy ? "lucide:loader-2" : "lucide:trash-2"} width={16} className={busy ? "animate-spin" : ""} />
                 예약 취소
               </button>

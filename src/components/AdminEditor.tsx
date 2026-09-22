@@ -9,19 +9,21 @@ import { useProfessor, useProfessors } from "./ProfessorsProvider";
 import { Professor } from "@/lib/config";
 import { fmtDate, fmtRange } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
+import { canChangeReservation } from "@/lib/reservation-time";
 
 export type EditorMode = { kind: "create" } | { kind: "move"; r: Reservation };
 
 type Props = {
   mode: EditorMode;
   today: string;
+  now: number;
   onCancel: () => void;
   /** 성공 시 호출. 목록 새로고침은 호출자가 담당 */
   onDone: (message: string) => Promise<void>;
 };
 
 /** 관리자용 예약 추가 / 이동 화면 */
-export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
+export default function AdminEditor({ mode, today, now, onCancel, onDone }: Props) {
   const [name, setName] = useState("");
   const [professor, setProfessor] = useState<Professor | null>(null);
   const [stage, setStage] = useState<"name" | "professor" | "slot">(mode.kind === "create" ? "name" : "slot");
@@ -83,6 +85,7 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
 
   // ── 이동 ──
   if (mode.kind === "move") {
+    if (!canChangeReservation(mode.r, now)) return <><ErrorBox>상담 시작 시간이 지나 이동할 수 없습니다.</ErrorBox><button type="button" onClick={onCancel} className={btnPrimary}>목록으로 돌아가기</button></>;
     if (!moveProf) return <ErrorBox>교수님 정보를 찾을 수 없습니다.</ErrorBox>;
     return (
       <>

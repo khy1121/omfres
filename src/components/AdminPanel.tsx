@@ -10,15 +10,21 @@ import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, S
 import { downloadCsv, reservationsToCsv } from "@/lib/csv";
 import { fmtDate, fmtRange, profName } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
+import { findProfessor } from "@/lib/config";
+import { canChangeReservation, reservationStatus, reservationStatusLabel } from "@/lib/reservation-time";
+import { useNow } from "./useNow";
 
 type Tab = "all" | "student" | "professors" | "pin";
 
 const pinInputCls = `${inputCls} text-center text-xl tracking-[0.5em] font-mono`;
 
-type Props = { initialAuthed: boolean; initialRows: Reservation[]; today: string };
+type Props = { initialAuthed: boolean; initialRows: Reservation[]; today: string; initialNow: number };
 
-export default function AdminPanel({ initialAuthed, initialRows, today }: Props) {
+export default function AdminPanel({ initialAuthed, initialRows, today, initialNow }: Props) {
   const PROFESSORS = useProfessors();
+  const now = useNow(initialNow);
+  const status = (r: Reservation) => reservationStatus(r, findProfessor(PROFESSORS, r.professorId)?.slotMinutes, now);
+  const isElapsed = (r: Reservation) => ["elapsed", "unknown"].includes(status(r));
   const [authed, setAuthed] = useState(initialAuthed);
   const [tab, setTab] = useState<Tab>("all");
 
@@ -158,8 +164,8 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   }, [rows, studentQuery]);
 
   const filtered = rows.filter((r) => profFilter === "all" || r.professorId === profFilter);
-  const visible = filtered.filter((r) => showPast || r.date >= today);
-  const upcomingCount = filtered.filter((r) => r.date >= today).length;
+  const visible = filtered.filter((r) => showPast || !isElapsed(r));
+  const upcomingCount = filtered.filter((r) => status(r) === "upcoming").length;
 
   const digitsOnly = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
@@ -203,7 +209,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
   ];
 
   const Row = ({ r, showStudent }: { r: Reservation; showStudent: boolean }) => {
-    const past = r.date < today;
+    const past = isElapsed(r);
     return (
       <li className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${past ? "border-neutral-100 text-neutral-400" : "border-neutral-200"}`}>
         <div className="min-w-0 flex-1">
@@ -214,6 +220,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             <span className="font-semibold">
               {fmtRange(PROFESSORS, r.professorId, r.time)}
             </span>
+            <span className="ml-2 text-xs text-neutral-500">{reservationStatusLabel[status(r)]}</span>
           </div>
           {showStudent && (
             <div className="mt-0.5 text-sm text-neutral-600">
@@ -232,7 +239,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
           </div>
         ) : (
           <div className="flex shrink-0">
-            {!past && (
+            {canChangeReservation(r, now) && (
               <button
                 type="button"
                 onClick={() => {
@@ -312,6 +319,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             <AdminEditor
               mode={editor}
               today={today}
+              now={now}
               onCancel={() => setEditor(null)}
               onDone={async (msg) => {
                 setEditor(null);
@@ -390,7 +398,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             {loading && rows.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">불러오는 중</p>
             ) : viewMode === "calendar" ? (
-              <AdminCalendar rows={filtered} today={today} profFilter={profFilter} busy={busy} onDelete={remove} onMove={(r) => { setNotice(null); setEditor({ kind: "move", r }); }} />
+              <AdminCalendar rows={visible} today={today} now={now} profFilter={profFilter} busy={busy} onDelete={remove} onMove={(r) => { setNotice(null); setEditor({ kind: "move", r }); }} />
             ) : visible.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">예약이 없습니다.</p>
             ) : (
@@ -420,7 +428,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
             ) : (
               <div className="space-y-3">
                 {byStudent.map(([sid, g]) => {
-                  const items = g.items.filter((r) => showPast || r.date >= today);
+                  const items = g.items.filter((r) => showPast || !isElapsed(r));
                   return (
                     <details key={sid} open={byStudent.length <= 5 || !!studentQuery} className="rounded-xl border border-neutral-200">
                       <summary className="flex cursor-pointer items-center justify-between px-4 py-3">
@@ -448,7 +456,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today }: Props)
           </>
         )}
 
-        {tab === "professors" && <ProfessorManager rows={rows} today={today} />}
+        {tab === "professors" && <ProfessorManager rows={rows} now={now} />}
 
         {tab === "pin" && (
           <form onSubmit={changePin} className="mx-auto max-w-sm">
