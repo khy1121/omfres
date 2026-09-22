@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 export const inputCls =
   "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10";
@@ -42,9 +42,11 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 }
 
 export function StepHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, [title]);
   return (
     <div className="mb-5 flex items-center justify-between">
-      <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+      <h2 ref={heading} tabIndex={-1} className="text-lg font-bold tracking-tight">{title}</h2>
       {onBack && <BackButton onClick={onBack} />}
     </div>
   );
