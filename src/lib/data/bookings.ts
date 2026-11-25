@@ -348,6 +348,27 @@ export async function busyOnDate(instructorId: string, studentId: string, date: 
   return { instructorBusy: ins.docs.map(toBusy), myBusy: mine.docs.map(toBusy) };
 }
 
+/**
+ * 교수자와 학생의 오늘 이후 예약 전체를 날짜별로 묶어 돌려준다 (기간 전체 남은 수 계산용).
+ * 등호 조건만 써서 운영 환경에서 복합 색인이 필요 없다.
+ */
+export async function upcomingBusyByDate(instructorId: string, studentId: string, today: string) {
+  const [ins, mine] = await Promise.all([
+    bookings().where("instructorId", "==", instructorId).where("status", "==", "booked").get(),
+    bookings().where("studentId", "==", studentId).where("status", "==", "booked").get(),
+  ]);
+  const group = (docs: FirebaseFirestore.QueryDocumentSnapshot[]) => {
+    const m = new Map<string, Busy[]>();
+    for (const d of docs) {
+      const date = d.data().date as string;
+      if (date < today) continue;
+      m.set(date, [...(m.get(date) ?? []), toBusy(d)]);
+    }
+    return m;
+  };
+  return { instructorBusyByDate: group(ins.docs), myBusyByDate: group(mine.docs) };
+}
+
 /** 이 일정에서 학생이 쓴 예약 횟수 */
 export async function quotaUsed(scheduleId: string, studentId: string): Promise<number> {
   const snap = await quotaRef(scheduleId, studentId).get();

@@ -140,3 +140,25 @@ test("moving sends a PATCH for the existing booking and passes the booking to th
   assert.ok(calls.some((c) => c.url.includes("/slots") && c.url.includes("booking=b1")));
   assert.deepEqual(calls.find((c) => c.method === "PATCH"), { url: "/api/bookings/b1", method: "PATCH", body: { date: "2099-09-24", time: "11:00" } });
 });
+
+test("the calendar shows remaining counts and blocks fully booked dates", async () => {
+  mockFetch((c) => {
+    if (c.url.includes("/availability")) return Response.json({ days: { "2099-09-24": 3, "2099-09-25": 0 }, next: { date: "2099-09-24", time: "10:30" } });
+    if (c.url.includes("/slots")) return slotsResponse(["10:00"]);
+    return Response.json({});
+  });
+  render(<BookingPicker courseId="c" scheduleId="s" cfg={cfg} today="2099-09-23" onDone={() => {}} />);
+  const open = await screen.findByRole("button", { name: /2099년 9월 24일.*예약 가능 시간 3개/ });
+  assert.ok(open.textContent?.includes("3개"));
+  const full = screen.getByRole("button", { name: /2099년 9월 25일.*마감/ });
+  assert.equal(full.getAttribute("aria-disabled"), "true");
+  assert.ok(screen.getByText("날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다."));
+});
+
+test("if the counts cannot be loaded, dates stay selectable by the schedule rules", async () => {
+  mockFetch((c) => (c.url.includes("/slots") ? slotsResponse() : new Response("down", { status: 503 })));
+  render(<BookingPicker courseId="c" scheduleId="s" cfg={cfg} today="2099-09-23" onDone={() => {}} />);
+  const day = screen.getByRole("button", { name: /2099년 9월 25일/ });
+  assert.equal(day.getAttribute("aria-disabled"), "false");
+  assert.equal(screen.queryByText("날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다."), null);
+});
