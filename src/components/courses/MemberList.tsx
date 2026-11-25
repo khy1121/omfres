@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { callApi } from "@/components/api";
 import { btnDanger, btnSecondary, ErrorBox, inputCls, successCls } from "@/components/ui";
 import { fmtKstDate } from "@/lib/kst";
+import { fmtDateShort } from "@/lib/schedule/rules";
 import type { Member } from "@/lib/data/courses";
 
 export default function MemberList({ courseId, members }: { courseId: string; members: Member[] }) {
@@ -26,11 +27,17 @@ export default function MemberList({ courseId, members }: { courseId: string; me
     setBusy(true);
     setError(null);
     setNotice(null);
-    const r = await callApi(`/api/courses/${courseId}/members/${m.uid}`, "DELETE");
+    const r = await callApi<{ cancelled: number; failed: { date: string; time: string }[] }>(`/api/courses/${courseId}/members/${m.uid}`, "DELETE");
     setBusy(false);
     setConfirming(null);
     if (!r.ok) return setError(r.error);
-    setNotice(`${m.name} 학생을 그룹에서 제외했습니다.`);
+    const { cancelled = 0, failed = [] } = r.data;
+    setNotice(`${m.name} 학생을 그룹에서 제외했습니다.${cancelled ? ` 예정된 상담 ${cancelled}건을 취소했습니다.` : ""}`);
+    if (failed.length) {
+      setError(
+        `예정된 상담 ${failed.length}건(${failed.map((f) => `${fmtDateShort(f.date)} ${f.time}`).join(", ")})은 취소하지 못했습니다. 해당 일정의 예약 현황에서 직접 취소해주세요.`,
+      );
+    }
     router.refresh();
   };
 
