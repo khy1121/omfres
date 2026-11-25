@@ -1,7 +1,7 @@
 "use client";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth, inMemoryPersistence, setPersistence, type Auth } from "firebase/auth";
+import { connectAuthEmulator, getAuth, inMemoryPersistence, setPersistence, type Auth } from "firebase/auth";
 
 // 브라우저용 Firebase — 로그인(ID 토큰 발급)에만 사용한다.
 // 로그인 상태는 서버의 httpOnly 세션 쿠키가 기준이므로 브라우저에는 로그인 정보를 남기지 않는다(메모리 보관).
@@ -19,6 +19,9 @@ export function clientAuth(): Promise<Auth> {
   if (!auth) {
     const app = getApps().length ? getApp() : initializeApp(config);
     const a = getAuth(app);
+    // 로컬 테스트(npm run dev:emulator)에서는 가짜 Google 로그인을 제공하는 Auth 에뮬레이터를 쓴다
+    const emulator = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST;
+    if (emulator) connectAuthEmulator(a, `http://${emulator}`, { disableWarnings: true });
     auth = setPersistence(a, inMemoryPersistence).then(() => a);
   }
   return auth;
