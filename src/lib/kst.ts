@@ -10,6 +10,11 @@ export function fmtKstDate(isoString: string | null | undefined): string {
   return Number.isFinite(d.getTime()) ? dateFmt.format(d) : "";
 }
 
+/** KST 기준 오늘 "YYYY-MM-DD" */
+export function kstToday(now = Date.now()): string {
+  return new Date(now + 9 * 3600_000).toISOString().slice(0, 10);
+}
+
 /** KST 기준 현재 연·월 */
 export function kstYearMonth(now = new Date()): { year: number; month: number } {
   const parts = partsFmt.formatToParts(now);
