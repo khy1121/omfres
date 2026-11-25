@@ -355,14 +355,43 @@ export async function quotaUsed(scheduleId: string, studentId: string): Promise<
 }
 
 /** 그룹에서 제외·탈퇴한 학생의 예정된 예약을 모두 취소 (교수자 권한으로) */
-export async function cancelUpcomingForStudentInCourse(courseId: string, studentId: string, instructorId: string): Promise<number> {
+export type BulkCancelResult = { cancelled: number; failed: { bookingId: string; date: string; time: string }[] };
+
+/** 일시적인 오류(트랜잭션 경합·시간 초과·일시 장애)인지 — 이런 경우만 다시 시도한다 */
+const isTransient = (e: unknown) => [4, 10, 14].includes((e as { code?: unknown })?.code as number);
+
+/**
+ * 그룹에서 제외·탈퇴한 학생의 예정된 예약을 모두 취소 (교수자 권한으로).
+ * 일시적인 오류는 몇 번 다시 시도하고, 끝내 취소하지 못한 예약은 따로 돌려준다 (호출한 쪽에서 안내).
+ */
+export async function cancelUpcomingForStudentInCourse(
+  courseId: string,
+  studentId: string,
+  instructorId: string,
+  { retries = 3, backoffMs = 200 } = {},
+): Promise<BulkCancelResult> {
   const now = Date.now();
   const snap = await bookings().where("courseId", "==", courseId).where("studentId", "==", studentId).where("status", "==", "booked").get();
-  let n = 0;
+  const result: BulkCancelResult = { cancelled: 0, failed: [] };
   for (const d of snap.docs) {
-    if (kstInstant(d.data().date, d.data().time) <= now) continue;
-    await cancelBooking({ bookingId: d.id, actor: { uid: instructorId, as: "instructor" } }).catch(() => {});
-    n++;
+    const { date, time } = d.data() as { date: string; time: string };
+    if (kstInstant(date, time) <= now) continue;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await cancelBooking({ bookingId: d.id, actor: { uid: instructorId, as: "instructor" } });
+        result.cancelled++;
+        break;
+      } catch (e) {
+        // 그사이 이미 취소·삭제된 예약은 목표를 이룬 것으로 보고 넘어간다
+        if (e instanceof BookingFailure && (e.code === "ALREADY_CANCELLED" || e.code === "BOOKING_NOT_FOUND")) break;
+        if (isTransient(e) && attempt < retries) {
+          await new Promise((r) => setTimeout(r, backoffMs * attempt));
+          continue;
+        }
+        result.failed.push({ bookingId: d.id, date, time });
+        break;
+      }
+    }
   }
-  return n;
+  return result;
 }

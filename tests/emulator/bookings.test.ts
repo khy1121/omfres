@@ -173,9 +173,18 @@ test("removing a student from a course cancels their upcoming bookings there", a
   const future = await schedules.createSchedule(courseB, prof.uid, input({ recurring: { from: "2027-12-01", to: "2027-12-31", windows: [{ days: [1], start: "10:00", end: "12:00" }], excludeDates: [] } }), "open");
   const b = await bookings.createBooking({ scheduleId: future, student: student(15), date: "2027-12-06", time: "10:00" });
   assert.ok(sid);
-  const n = await bookings.cancelUpcomingForStudentInCourse(courseB, students[15].uid, prof.uid);
-  assert.equal(n, 1);
+  // 취소에 실패한 예약은 성공으로 세지 않고 따로 돌려준다 (여기서는 권한 없는 교수자로 시도)
+  const denied = await bookings.cancelUpcomingForStudentInCourse(courseB, students[15].uid, "not-the-owner", { backoffMs: 1 });
+  assert.equal(denied.cancelled, 0);
+  assert.deepEqual(denied.failed.map((f) => f.bookingId), [b.id]);
+  assert.equal((await bookings.getBooking(b.id))?.status, "booked", "still booked after a failed attempt");
+
+  const ok = await bookings.cancelUpcomingForStudentInCourse(courseB, students[15].uid, prof.uid);
+  assert.deepEqual(ok, { cancelled: 1, failed: [] });
   assert.equal((await bookings.getBooking(b.id))?.status, "cancelled");
+
+  // 다시 실행해도 이미 취소된 예약은 대상이 아니다
+  assert.deepEqual(await bookings.cancelUpcomingForStudentInCourse(courseB, students[15].uid, prof.uid), { cancelled: 0, failed: [] });
 });
 
 test("busyOnDate returns instructor-wide and personal bookings for slot states", async () => {
