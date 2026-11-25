@@ -21,6 +21,12 @@ export async function POST(request: Request) {
   }
 
   const result = await joinByInvite(body.token, { uid: viewer.uid, name: viewer.name, email: viewer.email, studentNo: viewer.studentNo });
-  if (!result.ok) return jsonError(INVITE_STATUS_MESSAGE[result.status], result.status === "not_found" ? 404 : 410, result.status);
+  if (!result.ok) {
+    if (result.status === "not_student") {
+      // 참여 직전에 계정 유형이 바뀐 경우
+      return jsonError("학생 계정만 참여할 수 있습니다. 내 정보에서 계정 유형을 확인해주세요.", 409, "not_student");
+    }
+    return jsonError(INVITE_STATUS_MESSAGE[result.status], result.status === "not_found" ? 404 : 410, result.status);
+  }
   return NextResponse.json({ courseId: result.courseId, already: result.already });
 }

@@ -8,6 +8,7 @@ import { instructorDomains, isInstructorEligible } from "../auth/instructor";
 import { isInstructorProfile, isProfileComplete, type AccountType, type ProfileInput } from "../profile";
 import { syncMemberProfile } from "../data/courses";
 import { syncStudentOnUpcomingBookings } from "../data/bookings";
+import { saveProfileGuarded, type SaveProfileResult } from "../data/users";
 
 // 사용자 데이터 접근 계층. 화면·API는 Firestore를 직접 읽지 않고 이 함수들을 사용한다.
 
@@ -78,12 +79,12 @@ export async function ensureUserDoc(claims: SessionClaims, displayName: string |
   });
 }
 
-export async function updateProfile(uid: string, input: ProfileInput) {
-  await users().doc(uid).set(
-    { accountType: input.accountType, name: input.name, studentNo: input.studentNo, updatedAt: FieldValue.serverTimestamp() },
-    { merge: true },
-  );
+/** 프로필 저장. 그룹이 있는 상태에서 계정 유형을 바꾸려 하면 "has_membership" */
+export async function updateProfile(uid: string, input: ProfileInput): Promise<SaveProfileResult> {
+  const result = await saveProfileGuarded(uid, input);
+  if (result !== "saved") return result;
   await syncMemberProfile(uid, input.name, input.studentNo);
   // 교수가 보는 예약 현황·CSV에 바뀐 이름·학번이 나오도록 앞으로 있을 예약의 사본도 갱신
   if (input.accountType === "student") await syncStudentOnUpcomingBookings(uid, input.name, input.studentNo);
+  return result;
 }

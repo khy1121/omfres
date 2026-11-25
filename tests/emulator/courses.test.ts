@@ -3,6 +3,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 // guard는 반드시 데이터 모듈보다 먼저 불러온다 (환경변수 정리 후 Firebase 초기화)
 import "./guard";
+import { joinAsStudent } from "./seed";
 import * as data from "../../src/lib/data/courses";
 import { db } from "../../src/lib/firebase/admin";
 
@@ -36,8 +37,8 @@ test("creating a course makes the creator owner and issues an invite", async () 
 test("students join once via the invite; joining twice is idempotent", async () => {
   const id = await data.createCourse(prof, { title: "운영체제", term: "2026년 2학기", description: "" });
   const token = await tokenOf(id);
-  assert.deepEqual(await data.joinByInvite(token, alice), { ok: true, courseId: id, already: false });
-  assert.deepEqual(await data.joinByInvite(token, alice), { ok: true, courseId: id, already: true });
+  assert.deepEqual(await joinAsStudent(token, alice), { ok: true, courseId: id, already: false });
+  assert.deepEqual(await joinAsStudent(token, alice), { ok: true, courseId: id, already: true });
   assert.equal(await data.countStudents(id), 1);
   const members = await data.listMembers(id);
   assert.deepEqual(members.map((m) => [m.uid, m.role, m.studentNo]), [[prof.uid, "owner", null], [alice.uid, "student", "2071001"]]);
@@ -49,7 +50,7 @@ test("concurrent joins by different students all succeed exactly once", async ()
   const id = await data.createCourse(prof, { title: "동시 참여", term: "2026년 2학기", description: "" });
   const token = await tokenOf(id);
   const students = Array.from({ length: 30 }, (_, i) => ({ uid: `con-${i}`, name: `학생${i}`, email: null, studentNo: `2071${String(i).padStart(3, "0")}` }));
-  const results = await Promise.all(students.flatMap((s) => [data.joinByInvite(token, s), data.joinByInvite(token, s)]));
+  const results = await Promise.all(students.flatMap((s) => [joinAsStudent(token, s), joinAsStudent(token, s)]));
   assert.ok(results.every((r) => r.ok));
   assert.equal(results.filter((r) => r.ok && !r.already).length, 30);
   assert.equal(await data.countStudents(id), 30);
@@ -62,9 +63,9 @@ test("rotating the invite invalidates the old link immediately", async () => {
   const old = await tokenOf(id);
   const fresh = await data.rotateInvite(id, prof.uid, 7);
   assert.notEqual(old, fresh);
-  assert.deepEqual(await data.joinByInvite(old, alice), { ok: false, status: "revoked" });
+  assert.deepEqual(await joinAsStudent(old, alice), { ok: false, status: "revoked" });
   assert.equal((await data.previewInvite(old)).status, "revoked");
-  assert.equal((await data.joinByInvite(fresh, alice)).ok, true);
+  assert.equal((await joinAsStudent(fresh, alice)).ok, true);
   const course = await data.getCourse(id);
   assert.ok(course?.currentInvite?.expiresAt, "7-day expiry stored");
 });
@@ -73,23 +74,23 @@ test("a disabled invite rejects joins until a new one is issued", async () => {
   const id = await data.createCourse(prof, { title: "데이터베이스", term: "2026년 2학기", description: "" });
   const token = await tokenOf(id);
   await data.disableInvite(id);
-  assert.deepEqual(await data.joinByInvite(token, bob), { ok: false, status: "revoked" });
+  assert.deepEqual(await joinAsStudent(token, bob), { ok: false, status: "revoked" });
   assert.equal((await data.getCourse(id))?.currentInvite, null);
   const next = await data.rotateInvite(id, prof.uid, null);
-  assert.equal((await data.joinByInvite(next, bob)).ok, true);
+  assert.equal((await joinAsStudent(next, bob)).ok, true);
 });
 
 test("expired and unknown invites are rejected", async () => {
   const id = await data.createCourse(prof, { title: "만료", term: "2026년 2학기", description: "" });
   const token = await tokenOf(id);
   await db().collection("invites").doc(token).update({ expiresAt: new Date(Date.now() - 1000) });
-  assert.deepEqual(await data.joinByInvite(token, alice), { ok: false, status: "expired" });
-  assert.deepEqual(await data.joinByInvite("x".repeat(32), alice), { ok: false, status: "not_found" });
+  assert.deepEqual(await joinAsStudent(token, alice), { ok: false, status: "expired" });
+  assert.deepEqual(await joinAsStudent("x".repeat(32), alice), { ok: false, status: "not_found" });
 });
 
 test("removing a student deletes both membership copies; the owner cannot be removed", async () => {
   const id = await data.createCourse(prof, { title: "컴파일러", term: "2026년 2학기", description: "" });
-  await data.joinByInvite(await tokenOf(id), bob);
+  await joinAsStudent(await tokenOf(id), bob);
   assert.equal(await data.removeStudent(id, prof.uid), "is_owner");
   assert.equal(await data.removeStudent(id, bob.uid), "removed");
   assert.equal(await data.removeStudent(id, bob.uid), "not_member");
@@ -99,7 +100,7 @@ test("removing a student deletes both membership copies; the owner cannot be rem
 
 test("profile changes propagate to member copies and the owner name", async () => {
   const id = await data.createCourse({ ...prof, uid: "prof-sync" }, { title: "동기화", term: "2026년 2학기", description: "" });
-  await data.joinByInvite(await tokenOf(id), { ...alice, uid: "stu-sync" });
+  await joinAsStudent(await tokenOf(id), { ...alice, uid: "stu-sync" });
   await data.syncMemberProfile("stu-sync", "앨리스2", "2079999");
   await data.syncMemberProfile("prof-sync", "김교수2", null);
   const members = await data.listMembers(id);
