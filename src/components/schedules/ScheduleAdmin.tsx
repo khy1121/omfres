@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import BookingItem from "./BookingItem";
 import { bookingPhase } from "@/lib/schedule/phase";
 import BookingPicker from "./BookingPicker";
+import DateDiagnosisPanel from "./DateDiagnosisPanel";
 import { callApi } from "@/components/api";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, inputCls, successCls } from "@/components/ui";
 import { fmtDateKo, type SlotConfig } from "@/lib/schedule/rules";
@@ -160,6 +161,8 @@ export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg
           </div>
         </div>
       )}
+
+      <DateDiagnosisPanel courseId={courseId} scheduleId={scheduleId} today={today} />
 
       <section>
         <div className="mb-3 flex flex-wrap items-center gap-2">
