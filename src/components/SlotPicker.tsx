@@ -80,7 +80,7 @@ export default function SlotPicker({ today, professor, current, selection, onSel
         {professor.note && <p className="mb-4 text-xs text-neutral-500">{professor.note}</p>}
         {stage === "date" ? (
           <>
-            <Calendar selected={date} today={today} isSelectable={(d) => isDateSelectable(professor, d, today)}
+            <Calendar selected={date} today={today} max={lastBookableDate(today)} isSelectable={(d) => isDateSelectable(professor, d, today)}
               unavailableReason={(d) => dateUnavailableReason(professor, d, today)}
               onSelect={(d) => { choose({ date: d, time: d === date ? time : null }); setStage("time"); }} />
             <p className="mt-4 text-xs text-neutral-500">{today} ~ {lastBookableDate(today)} · 오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다. 잔여 시간은 날짜 선택 후 확인합니다.</p>
