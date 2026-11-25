@@ -9,6 +9,7 @@ import { getCourseAccess } from "@/lib/data/courses";
 import { getScheduleInCourse, isScheduleVisible } from "@/lib/data/schedules";
 import { listBookingsForSchedule, listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
 import { kstToday } from "@/lib/kst";
+import { effectiveCourseRole } from "@/lib/courses/model";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,10 @@ export default async function SchedulePage({
   const access = await getCourseAccess(id, viewer.uid);
   if (!access) notFound();
   const schedule = await getScheduleInCourse(id, sid);
-  if (!schedule || !isScheduleVisible(schedule, viewer.uid, access.role)) notFound();
-  const isOwner = access.role === "owner" && viewer.isInstructor;
+  // 개설자라도 현재 교수 자격이 없으면 학생과 같은 기준을 적용한다 (그룹 화면과 동일)
+  const role = effectiveCourseRole(access.role, viewer.isInstructor);
+  if (!schedule || !isScheduleVisible(schedule, viewer.uid, role)) notFound();
+  const isOwner = role === "owner";
   // 서버 렌더 시각을 화면의 기준 시각으로 쓴다
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
