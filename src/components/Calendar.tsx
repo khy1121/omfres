@@ -2,8 +2,7 @@
 
 import { Icon } from "@iconify/react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { lastBookableDate } from "@/lib/config";
-import { WEEKDAYS } from "@/lib/format";
+import { WEEKDAY_NAMES as WEEKDAYS } from "@/lib/schedule/rules";
 
 type Props = {
   selected: string | null;
@@ -11,19 +10,23 @@ type Props = {
   isSelectable: (date: string) => boolean;
   unavailableReason?: (date: string) => string | null;
   today: string;
+  /** 탐색 가능한 마지막 날짜 */
+  max: string;
+  /** 선택 전 처음 보여줄 날짜 (예: 첫 상담일) */
+  start?: string;
 };
 
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function Calendar({ selected, onSelect, isSelectable, unavailableReason, today }: Props) {
-  const max = lastBookableDate(today);
-  const [focusDate, setFocusDate] = useState(selected ?? today);
+export default function Calendar({ selected, onSelect, isSelectable, unavailableReason, today, max, start }: Props) {
+  const initial = selected ?? (start && start > today ? start : today);
+  const [focusDate, setFocusDate] = useState(initial);
   const focusRequested = useRef(false);
   const root = useRef<HTMLDivElement>(null);
   const [ty, tm] = today.split("-").map(Number);
-  const [iy, im] = (selected ?? today).split("-").map(Number);
+  const [iy, im] = initial.split("-").map(Number);
   const [view, setView] = useState({ y: iy, m: im - 1 });
   useLayoutEffect(() => {
     if (focusRequested.current) {
