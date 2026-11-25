@@ -123,6 +123,10 @@
 
 ### D. 접근성 점검
 16. 달력 선택 속성(`aria-selected` vs `aria-pressed`)을 실제 스크린리더로 확인하고, PageUp/PageDown 월 이동을 추가한다. (APG)
+    - 반영: 날짜 칸은 `button`이라 `aria-selected`를 쓸 수 없습니다(ARIA상 `gridcell`·`option` 등에만 허용). 그래서 `aria-pressed`를 유지했습니다.
+    - 날짜 칸 묶음에 "2030년 4월" 같은 그룹 이름과 키 안내를 연결했습니다.
+    - PageUp/PageDown(한 달), Shift+PageUp/PageDown(한 해) 이동을 추가했습니다.
+    - 실제 스크린리더(NVDA·VoiceOver) 낭독 확인은 아직 남아 있습니다.
 
 ---
 
