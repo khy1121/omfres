@@ -12,9 +12,13 @@ function app(): App {
   if (!projectId) throw new Error("FIREBASE_PROJECT_ID 환경변수가 없습니다.");
 
   const usingEmulator = !!process.env.FIRESTORE_EMULATOR_HOST || !!process.env.FIREBASE_AUTH_EMULATOR_HOST;
+  if (usingEmulator) {
+    // 에뮬레이터는 demo- 프로젝트로만 사용한다 (실제 프로젝트와 섞이지 않도록 서비스 계정도 쓰지 않음)
+    if (!projectId.startsWith("demo-")) throw new Error(`에뮬레이터 사용 시 FIREBASE_PROJECT_ID는 demo-로 시작해야 합니다: ${projectId}`);
+    return initializeApp({ projectId });
+  }
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  if (usingEmulator && (!clientEmail || !privateKey)) return initializeApp({ projectId });
   if (!clientEmail || !privateKey) throw new Error("FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY 환경변수가 없습니다.");
 
   return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), projectId });
