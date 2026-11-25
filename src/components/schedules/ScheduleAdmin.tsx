@@ -154,6 +154,10 @@ export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg
           <Icon icon="lucide:pencil" width={16} />
           수정
         </Link>
+        <Link href={`/courses/${courseId}/schedules/new?copy=${scheduleId}`} className={btnSecondary}>
+          <Icon icon="lucide:copy" width={16} />
+          복제
+        </Link>
         {!confirmDelete && (
           <button type="button" onClick={() => setConfirmDelete(true)} disabled={busy} className={`${btnSecondary} text-red-800`}>삭제</button>
         )}

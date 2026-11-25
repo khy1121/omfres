@@ -1,4 +1,4 @@
-import { addDays, type ScheduleInput } from "./rules";
+import { addDays, daysBetween, type ScheduleInput } from "./rules";
 
 // 일정 입력 폼의 편집 상태 ↔ 저장 형식 변환 (서버·브라우저 공용)
 
@@ -100,4 +100,40 @@ export function draftToInput(d: ScheduleDraft) {
         : null,
     manualSlots: d.manualSlots,
   };
+}
+
+/**
+ * 기존 일정을 복제해 새 일정 초안을 만든다.
+ * - 기간이 지난 일정이면 날짜 전체(기간·제외일·날짜별 변경·직접 지정 시간)를 주 단위로 미뤄 요일을 유지한다.
+ * - 다른 그룹으로 복제하면 대상 학생 지정은 "전체"로 되돌린다 (학생 목록이 다르므로).
+ * - 같은 그룹이면 지금 그룹에 남아 있는 학생만 유지한다.
+ */
+export function copyDraft(
+  src: ScheduleInput,
+  opts: { today: string; sameCourse: boolean; memberIds: string[] },
+): { draft: ScheduleDraft; shiftedWeeks: number } {
+  const d = draftFromSchedule(src);
+  d.title = `${src.title.slice(0, 44)} (복사본)`; // 일정 이름 50자 제한
+
+  if (!opts.sameCourse) {
+    d.audience = "all";
+    d.audienceIds = [];
+  } else {
+    d.audienceIds = d.audienceIds.filter((id) => opts.memberIds.includes(id));
+    if (d.audience === "selected" && !d.audienceIds.length) d.audience = "all";
+  }
+
+  const first = src.ruleType === "recurring" ? src.recurring?.from : [...src.manualSlots].sort()[0]?.slice(0, 10);
+  const lag = first ? daysBetween(first, opts.today) : 0;
+  const shiftedWeeks = lag > 0 ? Math.ceil(lag / 7) : 0;
+  if (shiftedWeeks) {
+    const n = shiftedWeeks * 7;
+    const mv = (date: string) => addDays(date, n);
+    if (d.from) d.from = mv(d.from);
+    if (d.to) d.to = mv(d.to);
+    d.excludeDates = d.excludeDates.split(/[\n,\s]+/).filter(Boolean).map(mv).join("\n");
+    d.overrides = d.overrides.map((o) => ({ ...o, date: mv(o.date) }));
+    d.manualSlots = d.manualSlots.map((s) => mv(s.slice(0, 10)) + s.slice(10));
+  }
+  return { draft: d, shiftedWeeks };
 }

@@ -93,6 +93,12 @@ export async function listSchedules(courseId: string): Promise<Schedule[]> {
   return snap.docs.map((d) => toSchedule(d.id, d.data())).sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
 }
 
+/** 교수자가 만든 모든 일정 (일정 복제 목록용, 최근 것부터) */
+export async function listSchedulesByInstructor(instructorId: string): Promise<Schedule[]> {
+  const snap = await schedules().where("instructorId", "==", instructorId).get();
+  return snap.docs.map((d) => toSchedule(d.id, d.data())).sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+}
+
 /**
  * 일정 수정. 예정된 예약에 저장된 일정 정보(이름·방식·장소·주소)도 함께 갱신한다.
  * 예약 시각과 길이는 예약 시점 값으로 고정되어 바뀌지 않는다.
