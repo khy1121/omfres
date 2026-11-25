@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emailDomain, isInstructorEligible, parseDomains } from "../src/lib/auth/instructor";
+import { emailDomain, instructorDomains, isInstructorEligible, parseDomains } from "../src/lib/auth/instructor";
 import { isInstructorProfile, isProfileComplete, isStudentProfileComplete, parseProfileInput } from "../src/lib/profile";
 import { safeNextPath } from "../src/lib/safe-redirect";
 
@@ -76,4 +76,14 @@ test("login redirect only allows same-site absolute paths", () => {
   assert.equal(safeNextPath("/\\evil.com"), "/");
   assert.equal(safeNextPath("me"), "/");
   assert.equal(safeNextPath(undefined, "/me"), "/me");
+});
+
+test("missing instructor domains are reported once and allow nobody", () => {
+  const warnings: string[] = [];
+  assert.deepEqual(instructorDomains({ INSTRUCTOR_EMAIL_DOMAINS: "hansung.ac.kr" }, (m) => warnings.push(m)), ["hansung.ac.kr"]);
+  assert.equal(warnings.length, 0);
+  assert.deepEqual(instructorDomains({}, (m) => warnings.push(m)), []);
+  assert.deepEqual(instructorDomains({ INSTRUCTOR_EMAIL_DOMAINS: " , " }, (m) => warnings.push(m)), []);
+  assert.equal(warnings.length, 1, "warned only once");
+  assert.match(warnings[0], /INSTRUCTOR_EMAIL_DOMAINS/);
 });
