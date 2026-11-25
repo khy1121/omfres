@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Calendar from "@/components/Calendar";
 import { callApi } from "@/components/api";
 import { btnPrimary, btnSecondary, ErrorBox } from "@/components/ui";
-import { dateUnavailableReason, fmtDateKo, scheduleRange, type AvailabilitySummary, type SlotConfig, type SlotState } from "@/lib/schedule/rules";
+import { dateUnavailableReason, fmtDateKo, fmtDateShort, scheduleRange, type AvailabilitySummary, type SlotConfig, type SlotState } from "@/lib/schedule/rules";
 import type { Booking } from "@/lib/data/bookings";
 
 type Props = {
@@ -85,6 +85,19 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
     requestAnimationFrame(() => slotsHeading.current?.focus());
   };
 
+  // 가장 빠른 예약 가능 시간 바로 선택. 다른 달이면 달력이 그 달을 보여주도록 다시 그린다.
+  const next = summary?.data.next ?? null;
+  const [calendarKey, setCalendarKey] = useState(0);
+  const pickNext = () => {
+    if (!next) return;
+    setDate(next.date);
+    setTime(next.time);
+    setError(null);
+    setCalendarKey((k) => k + 1);
+    requestAnimationFrame(() => slotsHeading.current?.focus());
+  };
+  const nextIsSelected = !!next && next.date === date && next.time === time;
+
   const confirm = async () => {
     if (!date || !time) return;
     setBusy(true);
@@ -130,7 +143,26 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
           현재 예약: <b className="tabular-nums">{fmtDateKo(moving.date)} {moving.time}</b>
         </p>
       )}
+      {next && !unknown && (
+        <button
+          type="button"
+          onClick={pickNext}
+          disabled={busy || nextIsSelected}
+          aria-label={`${moving ? "가장 빠른 변경 가능 시간" : "가장 빠른 상담"} ${fmtDateKo(next.date)} ${next.time} 선택`}
+          className="mb-4 flex min-h-14 w-full items-center gap-3 rounded-xl border-[1.5px] border-neutral-900 bg-white px-3.5 py-2.5 text-left transition hover:bg-neutral-50 disabled:cursor-default disabled:border-neutral-200 disabled:hover:bg-white"
+        >
+          <Icon icon="lucide:zap" width={20} className="shrink-0" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-xs text-neutral-600">{moving ? "가장 빠른 변경 가능 시간" : "가장 빠른 상담"}</span>
+            <span className="text-[15px] font-bold tabular-nums">
+              {fmtDateShort(next.date)} {next.time}
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold">{nextIsSelected ? "선택됨" : "선택 →"}</span>
+        </button>
+      )}
       <Calendar
+        key={calendarKey}
         selected={date}
         today={today}
         start={range.first}
