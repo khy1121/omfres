@@ -20,6 +20,8 @@ export type ScheduleDraft = {
   windows: { days: number[]; start: string; end: string }[];
   /** 줄바꿈으로 구분한 날짜 목록 */
   excludeDates: string;
+  /** 날짜별 예외 시간 */
+  overrides: { date: string; windows: { start: string; end: string }[] }[];
   manualSlots: string[];
 };
 
@@ -41,6 +43,7 @@ export function draftFromSchedule(s: ScheduleInput): ScheduleDraft {
     to: s.recurring?.to ?? "",
     windows: s.recurring?.windows ?? [{ days: [1], start: "10:00", end: "12:00" }],
     excludeDates: (s.recurring?.excludeDates ?? []).join("\n"),
+    overrides: s.recurring?.overrides ?? [],
     manualSlots: s.manualSlots,
   };
 }
@@ -64,6 +67,7 @@ export function emptyDraft(today: string, location: string): ScheduleDraft {
     to: addDays(today, 27),
     windows: [{ days: [1, 3], start: "10:00", end: "12:00" }],
     excludeDates: "",
+    overrides: [],
     manualSlots: [],
   };
 }
@@ -84,7 +88,7 @@ export function draftToInput(d: ScheduleDraft) {
     ruleType: d.ruleType,
     recurring:
       d.ruleType === "recurring"
-        ? { from: d.from, to: d.to, windows: d.windows, excludeDates: d.excludeDates.split(/[\n,\s]+/).filter(Boolean) }
+        ? { from: d.from, to: d.to, windows: d.windows, excludeDates: d.excludeDates.split(/[\n,\s]+/).filter(Boolean), overrides: d.overrides }
         : null,
     manualSlots: d.manualSlots,
   };

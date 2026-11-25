@@ -10,7 +10,16 @@ export const MAX_TOTAL_SLOTS = 3000;
 export const WEEKDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 export type TimeWindow = { days: number[]; start: string; end: string };
-export type RecurringRule = { from: string; to: string; windows: TimeWindow[]; excludeDates: string[] };
+/** 날짜별 예외 시간: 그날은 요일별 시간대 대신 이 시간대로 상담한다 (요일에 없는 날 추가도 가능) */
+export type DateOverride = { date: string; windows: { start: string; end: string }[] };
+export type RecurringRule = {
+  from: string;
+  to: string;
+  windows: TimeWindow[];
+  excludeDates: string[];
+  /** 예전에 저장된 일정에는 없다 */
+  overrides?: DateOverride[];
+};
 export type RuleType = "recurring" | "manual";
 export type SlotConfig = {
   slotMinutes: number;
@@ -91,13 +100,20 @@ export function slotTimesForDate(cfg: SlotConfig, date: string): string[] {
   }
   const r = cfg.recurring;
   if (!r || date < r.from || date > r.to || r.excludeDates.includes(date)) return [];
-  const dow = weekday(date);
+  const windows = windowsForDate(r, date);
   const times = new Set<string>();
-  for (const w of r.windows) {
-    if (!w.days.includes(dow)) continue;
+  for (const w of windows) {
     for (let m = toMin(w.start); m + cfg.slotMinutes <= toMin(w.end); m += cfg.slotMinutes) times.add(toTime(m));
   }
   return [...times].sort();
+}
+
+/** 그날 적용되는 시간대: 날짜별 예외가 있으면 그것, 없으면 요일별 시간대 */
+export function windowsForDate(r: RecurringRule, date: string): { start: string; end: string }[] {
+  const override = r.overrides?.find((o) => o.date === date);
+  if (override) return override.windows;
+  const dow = weekday(date);
+  return r.windows.filter((w) => w.days.includes(dow)).map(({ start, end }) => ({ start, end }));
 }
 
 /** 상담이 하나라도 있는 날짜 목록 */
@@ -162,13 +178,35 @@ const windowSchema = z
   .refine((w) => toMin(w.start) < toMin(w.end), "종료 시각은 시작 시각보다 늦어야 합니다.")
   .transform((w) => ({ ...w, days: [...new Set(w.days)].sort((a, b) => a - b) }));
 
+const timeRange = z
+  .object({
+    start: hhmm.refine(aligned, "시각은 5분 단위로 입력해주세요."),
+    end: hhmm.refine(aligned, "시각은 5분 단위로 입력해주세요."),
+  })
+  .refine((w) => toMin(w.start) < toMin(w.end), "종료 시각은 시작 시각보다 늦어야 합니다.");
+
+const overrideSchema = z
+  .object({
+    date: ymd,
+    windows: z.array(timeRange).min(1, "날짜별 시간 변경에 시간대를 하나 이상 넣어주세요.").max(4, "날짜별 시간 변경은 하루 4개 시간대까지 넣을 수 있습니다."),
+  })
+  .refine((o) => {
+    const ws = [...o.windows].sort((a, b) => toMin(a.start) - toMin(b.start));
+    return ws.every((w, i) => i === 0 || toMin(ws[i - 1].end) <= toMin(w.start));
+  }, "날짜별 시간 변경의 시간대가 서로 겹칩니다.")
+  .transform((o) => ({ ...o, windows: [...o.windows].sort((a, b) => toMin(a.start) - toMin(b.start)) }));
+
 const recurringSchema = z
   .object({
     from: ymd,
     to: ymd,
     windows: z.array(windowSchema).min(1, "상담 시간대를 하나 이상 추가해주세요.").max(14, "시간대는 14개까지 추가할 수 있습니다."),
     excludeDates: z.array(ymd).max(200, "제외일은 200개까지 추가할 수 있습니다.").default([]),
+    overrides: z.array(overrideSchema).max(100, "날짜별 시간 변경은 100개까지 추가할 수 있습니다.").default([]),
   })
+  .refine((r) => new Set(r.overrides.map((o) => o.date)).size === r.overrides.length, "같은 날짜의 시간 변경이 두 번 들어 있습니다.")
+  .refine((r) => r.overrides.every((o) => o.date >= r.from && o.date <= r.to), "날짜별 시간 변경은 상담 기간 안의 날짜만 넣을 수 있습니다.")
+  .refine((r) => !r.overrides.some((o) => r.excludeDates.includes(o.date)), "제외일과 날짜별 시간 변경에 같은 날짜가 있습니다.")
   .refine((r) => r.from <= r.to, "종료일은 시작일과 같거나 이후여야 합니다.")
   .refine((r) => daysBetween(r.from, r.to) < MAX_RANGE_DAYS, `상담 기간은 ${MAX_RANGE_DAYS}일 이내로 설정해주세요.`)
   .refine((r) => {
@@ -180,7 +218,11 @@ const recurringSchema = z
       }
     return true;
   }, "같은 요일의 시간대가 서로 겹칩니다.")
-  .transform((r) => ({ ...r, excludeDates: [...new Set(r.excludeDates)].sort() }));
+  .transform((r) => ({
+    ...r,
+    excludeDates: [...new Set(r.excludeDates)].sort(),
+    overrides: [...r.overrides].sort((a, b) => a.date.localeCompare(b.date)),
+  }));
 
 const manualSlot = z
   .string()
@@ -311,5 +353,6 @@ export function describeRule(cfg: SlotConfig): string {
   }
   const r = cfg.recurring!;
   const windows = r.windows.map((w) => `${fmtDays(w.days)} ${w.start}~${w.end}`).join(", ");
-  return `${fmtDateShort(r.from)} ~ ${fmtDateShort(r.to)} · ${windows}`;
+  const changed = r.overrides?.length ? ` · 날짜별 시간 변경 ${r.overrides.length}일` : "";
+  return `${fmtDateShort(r.from)} ~ ${fmtDateShort(r.to)} · ${windows}${changed}`;
 }
