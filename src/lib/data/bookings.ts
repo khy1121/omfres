@@ -355,7 +355,27 @@ export async function quotaUsed(scheduleId: string, studentId: string): Promise<
 }
 
 /** 그룹에서 제외·탈퇴한 학생의 예정된 예약을 모두 취소 (교수자 권한으로) */
-export type BulkCancelResult = { cancelled: number; failed: { bookingId: string; date: string; time: string }[] };
+/**
+ * 학생 프로필(이름·학번) 변경을 앞으로 있을 예약의 사본에 반영한다.
+ * 지난 상담·취소된 예약은 당시 정보 그대로 둔다 (기록 보존).
+ * @returns 갱신한 예약 수
+ */
+export async function syncStudentOnUpcomingBookings(studentId: string, name: string, studentNo: string | null, now = Date.now()): Promise<number> {
+  const snap = await bookings().where("studentId", "==", studentId).where("status", "==", "booked").get();
+  const targets = snap.docs.filter((d) => {
+    const x = d.data();
+    const end = kstInstant(x.date, x.time) + (x.slotMinutes ?? 0) * 60_000;
+    return end > now && (x.studentName !== name || (x.studentNo ?? null) !== studentNo);
+  });
+  for (let i = 0; i < targets.length; i += 400) {
+    const batch = db().batch();
+    for (const d of targets.slice(i, i + 400)) batch.update(d.ref, { studentName: name, studentNo, updatedAt: FieldValue.serverTimestamp() });
+    await batch.commit();
+  }
+  return targets.length;
+}
+
+export type BulkCancelResult ={ cancelled: number; failed: { bookingId: string; date: string; time: string }[] };
 
 /** 일시적인 오류(트랜잭션 경합·시간 초과·일시 장애)인지 — 이런 경우만 다시 시도한다 */
 const isTransient = (e: unknown) => [4, 10, 14].includes((e as { code?: unknown })?.code as number);

@@ -7,6 +7,7 @@ import { readSession, type SessionClaims } from "../session";
 import { instructorDomains, isInstructorEligible } from "../auth/instructor";
 import { isInstructorProfile, isProfileComplete, type AccountType, type ProfileInput } from "../profile";
 import { syncMemberProfile } from "../data/courses";
+import { syncStudentOnUpcomingBookings } from "../data/bookings";
 
 // 사용자 데이터 접근 계층. 화면·API는 Firestore를 직접 읽지 않고 이 함수들을 사용한다.
 
@@ -83,4 +84,6 @@ export async function updateProfile(uid: string, input: ProfileInput) {
     { merge: true },
   );
   await syncMemberProfile(uid, input.name, input.studentNo);
+  // 교수가 보는 예약 현황·CSV에 바뀐 이름·학번이 나오도록 앞으로 있을 예약의 사본도 갱신
+  if (input.accountType === "student") await syncStudentOnUpcomingBookings(uid, input.name, input.studentNo);
 }
