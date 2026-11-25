@@ -1,10 +1,13 @@
 import ProfileForm from "@/components/auth/ProfileForm";
 import { requireViewer } from "@/lib/dal/user";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 export const dynamic = "force-dynamic";
 
-export default async function MePage() {
+export default async function MePage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const viewer = await requireViewer("/me");
+  const rawNext = (await searchParams).next;
+  const next = rawNext ? safeNextPath(rawNext, "") || null : null;
   const description = !viewer.profileComplete
     ? "처음 오셨네요. 계정 유형과 이름을 입력해주세요. 학생은 학번도 필요합니다."
     : viewer.isInstructor
@@ -21,6 +24,7 @@ export default async function MePage() {
           initial={{ accountType: viewer.accountType, name: viewer.name, studentNo: viewer.studentNo ?? "" }}
           email={viewer.email}
           instructorEligible={viewer.instructorEligible}
+          next={next}
         />
       </div>
     </main>

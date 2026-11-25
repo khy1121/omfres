@@ -23,8 +23,8 @@ export default function Nav({ viewer }: { viewer: { name: string } | null }) {
           상담 예약
         </Link>
         <div className="flex gap-1">
-          {[...links, account].map((l) => {
-            const active = path === l.href;
+          {[...(viewer ? [{ href: "/courses", label: "내 수업", icon: "lucide:book-open" }] : []), ...links, account].map((l) => {
+            const active = l.href === "/courses" ? path.startsWith("/courses") : path === l.href;
             return (
               <Link
                 key={l.href}
