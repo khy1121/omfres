@@ -6,6 +6,7 @@ import { db } from "../firebase/admin";
 import { readSession, type SessionClaims } from "../session";
 import { instructorDomains, isInstructorEligible } from "../auth/instructor";
 import { isInstructorProfile, isProfileComplete, type AccountType, type ProfileInput } from "../profile";
+import { syncMemberProfile } from "../data/courses";
 
 // 사용자 데이터 접근 계층. 화면·API는 Firestore를 직접 읽지 않고 이 함수들을 사용한다.
 
@@ -81,5 +82,5 @@ export async function updateProfile(uid: string, input: ProfileInput) {
     { accountType: input.accountType, name: input.name, studentNo: input.studentNo, updatedAt: FieldValue.serverTimestamp() },
     { merge: true },
   );
-  // 이후 단계: 참여 중인 그룹의 멤버 문서(이름·학번 사본)도 함께 갱신한다 (M1)
+  await syncMemberProfile(uid, input.name, input.studentNo);
 }

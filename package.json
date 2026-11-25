@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "tsx --tsconfig tsconfig.test.json --test tests/*.test.ts tests/*.test.tsx",
     "seed": "tsx scripts/seed.ts",
-    "seed:dry": "tsx scripts/seed.ts --dry-run"
+    "seed:dry": "tsx scripts/seed.ts --dry-run",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-reservation \"tsx --conditions=react-server --tsconfig tsconfig.test.json --test tests/emulator/*.test.ts\""
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
@@ -31,6 +32,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "firebase-tools": "^15.37.0",
     "jsdom": "^28.1.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",

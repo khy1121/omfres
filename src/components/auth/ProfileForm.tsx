@@ -10,6 +10,8 @@ type Props = {
   initial: { accountType: AccountType | null; name: string; studentNo: string };
   email: string | null;
   instructorEligible: boolean;
+  /** 저장 후 돌아갈 경로 (예: 초대 링크 참여 화면) */
+  next?: string | null;
 };
 
 const TYPES: { value: AccountType; label: string; icon: string; hint: string }[] = [
@@ -17,7 +19,7 @@ const TYPES: { value: AccountType; label: string; icon: string; hint: string }[]
   { value: "instructor", label: "교수", icon: "lucide:graduation-cap", hint: "수업 그룹을 만들고 상담 일정을 엽니다." },
 ];
 
-export default function ProfileForm({ initial, email, instructorEligible }: Props) {
+export default function ProfileForm({ initial, email, instructorEligible, next }: Props) {
   const router = useRouter();
   const [accountType, setAccountType] = useState<AccountType | null>(initial.accountType);
   const [name, setName] = useState(initial.name);
@@ -45,6 +47,11 @@ export default function ProfileForm({ initial, email, instructorEligible }: Prop
       if (!res.ok) throw new Error(data?.error ?? "저장하지 못했습니다.");
       setName(data?.name ?? name);
       setStudentNo(data?.studentNo ?? "");
+      if (next) {
+        router.push(next);
+        router.refresh();
+        return;
+      }
       setSaved(true);
       router.refresh();
     } catch (err) {
