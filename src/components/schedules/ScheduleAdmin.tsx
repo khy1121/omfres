@@ -8,6 +8,7 @@ import BookingItem from "./BookingItem";
 import { bookingPhase } from "@/lib/schedule/phase";
 import BookingPicker from "./BookingPicker";
 import DateDiagnosisPanel from "./DateDiagnosisPanel";
+import WeekBoard from "./WeekBoard";
 import { callApi } from "@/components/api";
 import { btnDanger, btnPrimary, btnSecondary, Card, ErrorBox, inputCls, successCls } from "@/components/ui";
 import { fmtDateKo, type SlotConfig } from "@/lib/schedule/rules";
@@ -24,7 +25,11 @@ type Props = {
   today: string;
   now: number;
   bookings: Booking[];
+  /** 같은 교수의 다른 일정 예약 (주간 보기용, 수업·일정 이름만) */
+  otherBookings: OtherBooking[];
 };
+
+export type OtherBooking = { id: string; scheduleId: string; date: string; time: string; endTime: string; courseTitle: string; scheduleTitle: string };
 
 type Filter = "upcoming" | "past" | "cancelled" | "all";
 const FILTERS: { v: Filter; label: string }[] = [
@@ -40,7 +45,8 @@ const STATUS_ACTIONS: Record<ScheduleStatus, { to: ScheduleStatus; label: string
   closed: [{ to: "open", label: "다시 공개", primary: true }],
 };
 
-export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg, today, now, bookings }: Props) {
+export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg, today, now, bookings, otherBookings }: Props) {
+  const [view, setView] = useState<"list" | "week">("list");
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("upcoming");
   const [query, setQuery] = useState("");
@@ -167,11 +173,32 @@ export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg
       <section>
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto text-lg font-bold tracking-tight">예약 현황</h2>
-          <button type="button" onClick={exportCsv} disabled={!shown.length} className={`${btnSecondary} min-h-10 px-3 py-1.5`}>
+          <div className="flex rounded-lg ring-1 ring-neutral-200" role="group" aria-label="보기 방식">
+            {(["list", "week"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={`min-h-10 px-3 text-sm first:rounded-l-lg last:rounded-r-lg ${view === v ? "bg-neutral-900 font-semibold text-white" : "bg-white text-neutral-700"}`}
+              >
+                {v === "list" ? "목록" : "주간"}
+              </button>
+            ))}
+          </div>
+          {view === "list" && <button type="button" onClick={exportCsv} disabled={!shown.length} className={`${btnSecondary} min-h-10 px-3 py-1.5`}>
             <Icon icon="lucide:download" width={16} />
             CSV ({shown.length}건)
-          </button>
+          </button>}
         </div>
+        {view === "week" ? (
+          <WeekBoard
+            cfg={cfg}
+            scheduleId={scheduleId}
+            today={today}
+            bookings={[...bookings.filter((b) => b.status === "booked"), ...otherBookings.map((o) => ({ ...o, studentName: "", studentNo: null }))]}
+          />
+        ) : (<>
         <div className="mb-3 flex flex-wrap gap-1" role="group" aria-label="예약 상태 필터">
           {FILTERS.map((f) => (
             <button
@@ -211,6 +238,7 @@ export default function ScheduleAdmin({ courseId, scheduleId, title, status, cfg
             ))}
           </div>
         )}
+        </>)}
       </section>
     </div>
   );
