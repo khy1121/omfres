@@ -30,6 +30,8 @@ export type Booking = {
   time: string;
   endTime: string;
   slotMinutes: number;
+  /** 예약 시점의 상담 후 여유 시간 (예전 예약은 0) */
+  bufferMinutes: number;
   status: BookingStatus;
   scheduleTitle: string;
   courseTitle: string;
@@ -103,6 +105,7 @@ function toBooking(id: string, d: FirebaseFirestore.DocumentData): Booking {
     time: d.time,
     endTime: d.endTime,
     slotMinutes: d.slotMinutes,
+    bufferMinutes: d.bufferMinutes ?? 0,
     status: d.status,
     scheduleTitle: d.scheduleTitle ?? "",
     courseTitle: d.courseTitle ?? "",
@@ -119,13 +122,15 @@ function toBooking(id: string, d: FirebaseFirestore.DocumentData): Booking {
 
 export const bookingStart = (b: Pick<Booking, "date" | "time">) => kstInstant(b.date, b.time);
 
-/** 예약 한 건이 잡는 잠금 문서 목록 */
-function lockRefs(scheduleId: string, instructorId: string, studentId: string, startMs: number, minutes: number) {
-  const blocks = lockBlocks(startMs, minutes);
+/**
+ * 예약 한 건이 잡는 잠금 문서 목록.
+ * 교수자 잠금은 상담 + 상담 후 여유 시간만큼, 학생 잠금은 상담 시간만큼 잡는다.
+ */
+function lockRefs(scheduleId: string, instructorId: string, studentId: string, startMs: number, minutes: number, bufferMinutes = 0) {
   return {
     slot: slotLockRef(scheduleId, startMs),
-    instructor: blocks.map((b) => instructorLockRef(instructorId, b)),
-    student: blocks.map((b) => studentLockRef(studentId, b)),
+    instructor: lockBlocks(startMs, minutes + bufferMinutes).map((b) => instructorLockRef(instructorId, b)),
+    student: lockBlocks(startMs, minutes).map((b) => studentLockRef(studentId, b)),
   };
 }
 
@@ -137,9 +142,9 @@ function checkLocks(
 ): BookingError | null {
   const foreign = (s: DocumentSnapshot) => s.exists && s.data()!.bookingId !== ownBookingId;
   if (foreign(snaps.slot)) return "SLOT_TAKEN";
-  const busy = snaps.instructor.find(foreign);
-  if (busy) return busy.data()!.studentId === studentId ? "STUDENT_OVERLAP" : "INSTRUCTOR_BUSY";
+  // 학생 본인 겹침을 먼저 본다. 교수자 잠금만 걸리면(다른 학생 예약 또는 여유 시간) 교수 일정과 겹침
   if (snaps.student.some(foreign)) return "STUDENT_OVERLAP";
+  if (snaps.instructor.some(foreign)) return "INSTRUCTOR_BUSY";
   return null;
 }
 
@@ -175,7 +180,7 @@ export async function createBooking(args: { scheduleId: string; student: Student
     if (!sSnap.exists) throw new BookingFailure("SCHEDULE_NOT_FOUND");
     const schedule = scheduleFromDoc(sSnap.id, sSnap.data()!);
     const startMs = kstInstant(date, time);
-    const refs = lockRefs(scheduleId, schedule.instructorId, student.uid, startMs, schedule.slotMinutes);
+    const refs = lockRefs(scheduleId, schedule.instructorId, student.uid, startMs, schedule.slotMinutes, schedule.bufferMinutes);
     const [member, course, quota] = await tx.getAll(memberRef(schedule.courseId, student.uid), courseRef(schedule.courseId), quotaRef(scheduleId, student.uid));
     const locks = await readLocks(tx, refs);
 
@@ -202,6 +207,7 @@ export async function createBooking(args: { scheduleId: string; student: Student
       endTime: addMinutes(time, schedule.slotMinutes),
       startsAt: Timestamp.fromMillis(startMs),
       slotMinutes: schedule.slotMinutes,
+      bufferMinutes: schedule.bufferMinutes,
       status: "booked" as const,
       scheduleTitle: schedule.title,
       courseTitle: c.title ?? "",
@@ -242,9 +248,9 @@ export async function moveBooking(args: { bookingId: string; actor: Actor; date:
 
     const oldStart = bookingStart(b);
     const newStart = kstInstant(date, time);
-    const oldRefs = lockRefs(b.scheduleId, b.instructorId, b.studentId, oldStart, b.slotMinutes);
+    const oldRefs = lockRefs(b.scheduleId, b.instructorId, b.studentId, oldStart, b.slotMinutes, b.bufferMinutes);
     // 새 시각은 현재 일정의 상담 길이로 잡는다
-    const newRefs = lockRefs(b.scheduleId, b.instructorId, b.studentId, newStart, schedule.slotMinutes);
+    const newRefs = lockRefs(b.scheduleId, b.instructorId, b.studentId, newStart, schedule.slotMinutes, schedule.bufferMinutes);
     const oldLocks = await readLocks(tx, oldRefs);
     const newLocks = await readLocks(tx, newRefs);
 
@@ -269,6 +275,7 @@ export async function moveBooking(args: { bookingId: string; actor: Actor; date:
       endTime: addMinutes(time, schedule.slotMinutes),
       startsAt: Timestamp.fromMillis(newStart),
       slotMinutes: schedule.slotMinutes,
+      bufferMinutes: schedule.bufferMinutes,
       updatedAt: FieldValue.serverTimestamp(),
     };
     tx.update(bSnap.ref, patch);
@@ -292,7 +299,7 @@ export async function cancelBooking(args: { bookingId: string; actor: Actor; now
     const start = bookingStart(b);
     if (actor.as === "student" && isPastDeadline(start, cancelCloseHours, now)) throw new BookingFailure("CANCEL_CLOSED");
 
-    const refs = lockRefs(b.scheduleId, b.instructorId, b.studentId, start, b.slotMinutes);
+    const refs = lockRefs(b.scheduleId, b.instructorId, b.studentId, start, b.slotMinutes, b.bufferMinutes);
     const locks = await readLocks(tx, refs);
     const quota = await tx.get(quotaRef(b.scheduleId, b.studentId));
 
@@ -336,7 +343,8 @@ type Busy = BusyInterval & { bookingId: string };
 function toBusy(d: FirebaseFirestore.QueryDocumentSnapshot): Busy {
   const x = d.data();
   const start = kstInstant(x.date, x.time);
-  return { start, end: start + x.slotMinutes * 60_000, scheduleId: x.scheduleId, studentId: x.studentId, bookingId: d.id };
+  const end = start + x.slotMinutes * 60_000;
+  return { start, end, holdEnd: end + (x.bufferMinutes ?? 0) * 60_000, scheduleId: x.scheduleId, studentId: x.studentId, bookingId: d.id };
 }
 
 /** 그날 교수자의 모든 예약과 학생 본인의 모든 예약 (슬롯 상태 계산용) */

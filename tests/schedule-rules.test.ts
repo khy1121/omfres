@@ -251,3 +251,42 @@ test("availability summary counts bookable times per date and finds the earliest
   });
   assert.deepEqual(none, { days: {}, next: null });
 });
+
+test("a buffer spaces generated start times and blocks adjacent consultations of the instructor", () => {
+  const buffered: SlotConfig = { ...recurring, bufferMinutes: 10 };
+  assert.deepEqual(slotTimesForDate(buffered, "2026-12-07"), ["10:00", "10:40", "11:20"], "30 min + 10 min rest within 10:00~12:00");
+
+  const date = "2026-12-07";
+  const at = (t: string, mins = 30, buf = 0) => {
+    const start = kstInstant(date, t);
+    const end = start + mins * 60_000;
+    return { start, end, holdEnd: end + buf * 60_000 };
+  };
+  // 다른 일정(여유 없음)의 11:10~11:40 예약 → 이 일정의 10:40(쉬는 시간 11:20까지)과 11:20이 막힌다
+  const states = daySlotStates({
+    cfg: buffered, scheduleId: "S", date, studentId: "me",
+    instructorBusy: [{ ...at("11:10"), scheduleId: "OTHER", studentId: "x", bookingId: "o" }],
+    myBusy: [], bookingCloseHours: 0, now: 0,
+  });
+  assert.deepEqual(states.map((s) => [s.time, s.reason]), [["10:00", null], ["10:40", "taken"], ["11:20", "taken"]]);
+
+  // 다른 일정의 09:30~10:00 예약이 쉬는 시간 15분을 갖고 있으면 10:00 시작은 막힌다
+  const after = daySlotStates({
+    cfg: recurring, scheduleId: "S", date, studentId: "me",
+    instructorBusy: [{ ...at("09:30", 30, 15), scheduleId: "OTHER", studentId: "x", bookingId: "o" }],
+    myBusy: [], bookingCloseHours: 0, now: 0,
+  });
+  assert.deepEqual(after.map((s) => [s.time, s.reason]), [["10:00", "taken"], ["10:30", null], ["11:00", null], ["11:30", null]]);
+});
+
+test("buffer input is validated and manual slots must leave room for it", () => {
+  assert.ok("data" in parseScheduleInput({ ...base, bufferMinutes: 10 }));
+  const old = parseScheduleInput(base);
+  assert.ok("data" in old && old.data.bufferMinutes === 0, "defaults to no buffer");
+  const r1 = parseScheduleInput({ ...base, bufferMinutes: 7 });
+  assert.ok("error" in r1 && /5분 단위/.test(r1.error));
+  const manual = { ...base, ruleType: "manual", recurring: null, bufferMinutes: 10 };
+  const tooClose = parseScheduleInput({ ...manual, manualSlots: ["2026-12-10 09:00", "2026-12-10 09:30"] });
+  assert.ok("error" in tooClose && /여유 시간/.test(tooClose.error));
+  assert.ok("data" in parseScheduleInput({ ...manual, manualSlots: ["2026-12-10 09:00", "2026-12-10 09:40"] }));
+});

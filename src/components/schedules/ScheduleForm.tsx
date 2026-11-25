@@ -21,6 +21,7 @@ import { draftToInput as toInput, type ScheduleDraft as Draft } from "@/lib/sche
 type Student = { uid: string; name: string; studentNo: string | null };
 
 const SLOT_CHOICES = [10, 15, 20, 30, 40, 45, 50, 60, 90, 120];
+const BUFFER_CHOICES = [0, 5, 10, 15, 20, 30];
 const HOUR_CHOICES = [
   { v: "0", label: "상담 시작 전까지" },
   { v: "1", label: "1시간 전까지" },
@@ -169,6 +170,14 @@ export default function ScheduleForm(props: Props) {
             ))}
           </select>
         </Field>
+        <Field label="상담 후 여유 시간" icon="lucide:coffee">
+          <select className={inputCls} value={d.bufferMinutes} onChange={(e) => set("bufferMinutes", e.target.value)}>
+            {[...new Set([...BUFFER_CHOICES, Number(d.bufferMinutes)])].sort((a, b) => a - b).map((m) => (
+              <option key={m} value={m}>{m === 0 ? "없음" : `${m}분`}</option>
+            ))}
+          </select>
+        </Field>
+        <p className="-mt-2 text-xs text-neutral-500">상담이 끝난 뒤 다음 상담까지 비워 둘 시간입니다. 다른 수업 상담도 이 시간에는 잡히지 않습니다.</p>
       </Section>
 
       <Section title="상담 시간" icon="lucide:calendar-clock">
