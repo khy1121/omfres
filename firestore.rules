@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// 브라우저는 Firestore에 직접 접근하지 않는다.
+// 모든 읽기·쓰기는 Next 서버(Admin SDK, 규칙 적용 안 됨)를 거치며 권한은 서버 DAL에서 검사한다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
