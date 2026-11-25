@@ -55,6 +55,7 @@ export type BookingError =
   | "INSTRUCTOR_BUSY"
   | "STUDENT_OVERLAP"
   | "LIMIT_REACHED"
+  | "DAY_FULL"
   | "BOOKING_NOT_FOUND"
   | "FORBIDDEN"
   | "ALREADY_CANCELLED"
@@ -70,6 +71,7 @@ export const BOOKING_ERROR: Record<BookingError, { status: number; message: stri
   INSTRUCTOR_BUSY: { status: 409, message: "이 시간은 교수님의 다른 상담과 겹쳐 예약할 수 없습니다. 다른 시간을 선택해주세요." },
   STUDENT_OVERLAP: { status: 409, message: "내 다른 예약과 시간이 겹칩니다. 다른 시간을 선택해주세요." },
   LIMIT_REACHED: { status: 409, message: "이 일정에서 예약할 수 있는 횟수를 모두 사용했습니다." },
+  DAY_FULL: { status: 409, message: "이 날은 상담이 모두 찼습니다. 다른 날짜를 선택해주세요." },
   BOOKING_NOT_FOUND: { status: 404, message: "예약을 찾을 수 없습니다." },
   FORBIDDEN: { status: 403, message: "이 예약을 변경할 권한이 없습니다." },
   ALREADY_CANCELLED: { status: 409, message: "이미 취소된 예약입니다." },
@@ -87,6 +89,7 @@ const slotLockRef = (scheduleId: string, startMs: number) => db().collection("sl
 const instructorLockRef = (uid: string, block: number) => db().collection("instructorLocks").doc(`${uid}_${block}`);
 const studentLockRef = (uid: string, block: number) => db().collection("studentLocks").doc(`${uid}_${block}`);
 const quotaRef = (scheduleId: string, studentId: string) => db().collection("studentQuota").doc(`${scheduleId}_${studentId}`);
+const scheduleDayRef = (scheduleId: string, date: string) => db().collection("scheduleDays").doc(`${scheduleId}_${date}`);
 const memberRef = (courseId: string, uid: string) => db().collection("courses").doc(courseId).collection("members").doc(uid);
 const courseRef = (courseId: string) => db().collection("courses").doc(courseId);
 const iso = (v: unknown): string | null => (v instanceof Timestamp ? v.toDate().toISOString() : null);
@@ -168,6 +171,19 @@ function deleteOwnedLocks(tx: Transaction, refs: DocumentReference[], snaps: Doc
   });
 }
 
+/**
+ * 하루 최대 상담 수 확인: 그날 이 일정의 예약 수를 트랜잭션 안에서 센다.
+ * 날짜 문서를 함께 읽고 나중에 쓰기 때문에 같은 날의 동시 예약은 반드시 차례로 처리되고,
+ * 다시 실행된 쪽은 늘어난 예약 수를 본다. (한도가 있는 일정에서만 호출)
+ */
+async function readDayCount(tx: Transaction, scheduleId: string, date: string) {
+  const [day, booked] = await Promise.all([
+    tx.get(scheduleDayRef(scheduleId, date)),
+    tx.get(bookings().where("scheduleId", "==", scheduleId).where("date", "==", date).where("status", "==", "booked")),
+  ]);
+  return { ref: day.ref, count: booked.size };
+}
+
 type StudentInfo = { uid: string; name: string; studentNo: string | null; email: string | null };
 
 /** 예약 생성 (학생 본인) */
@@ -183,6 +199,7 @@ export async function createBooking(args: { scheduleId: string; student: Student
     const refs = lockRefs(scheduleId, schedule.instructorId, student.uid, startMs, schedule.slotMinutes, schedule.bufferMinutes);
     const [member, course, quota] = await tx.getAll(memberRef(schedule.courseId, student.uid), courseRef(schedule.courseId), quotaRef(scheduleId, student.uid));
     const locks = await readLocks(tx, refs);
+    const day = schedule.maxPerDay > 0 ? await readDayCount(tx, scheduleId, date) : null;
 
     if (!member.exists || member.data()!.role !== "student") throw new BookingFailure("NOT_MEMBER");
     if (!isScheduleVisible(schedule, student.uid, "student")) throw new BookingFailure(schedule.status === "open" ? "SCHEDULE_NOT_FOUND" : "NOT_OPEN");
@@ -192,6 +209,7 @@ export async function createBooking(args: { scheduleId: string; student: Student
     if (lockError) throw new BookingFailure(lockError);
     const used = quota.exists ? (quota.data()!.count as number) : 0;
     if (used >= schedule.maxBookingsPerStudent) throw new BookingFailure("LIMIT_REACHED");
+    if (day && day.count >= schedule.maxPerDay) throw new BookingFailure("DAY_FULL");
 
     const c = course.data() ?? {};
     const data = {
@@ -222,6 +240,7 @@ export async function createBooking(args: { scheduleId: string; student: Student
     };
     tx.set(ref, data);
     writeLocks(tx, refs, ref.id, student.uid);
+    if (day) tx.set(day.ref, { touchedAt: FieldValue.serverTimestamp() });
     tx.set(quotaRef(scheduleId, student.uid), { count: used + 1 });
     return toBooking(ref.id, { ...data, createdAt: Timestamp.fromMillis(now), updatedAt: Timestamp.fromMillis(now) });
   });
@@ -253,6 +272,8 @@ export async function moveBooking(args: { bookingId: string; actor: Actor; date:
     const newRefs = lockRefs(b.scheduleId, b.instructorId, b.studentId, newStart, schedule.slotMinutes, schedule.bufferMinutes);
     const oldLocks = await readLocks(tx, oldRefs);
     const newLocks = await readLocks(tx, newRefs);
+    // 학생이 다른 날로 옮길 때만 그날의 최대 상담 수를 확인한다 (교수자는 한도를 정한 본인이라 적용하지 않음)
+    const day = actor.as === "student" && schedule.maxPerDay > 0 && date !== b.date ? await readDayCount(tx, b.scheduleId, date) : null;
 
     if (actor.as === "student") {
       if (!isScheduleVisible(schedule, actor.uid, "student")) throw new BookingFailure("NOT_OPEN");
@@ -265,10 +286,12 @@ export async function moveBooking(args: { bookingId: string; actor: Actor; date:
     if (!hasSlot(schedule, date, time)) throw new BookingFailure("INVALID_SLOT");
     const lockError = checkLocks(newLocks, b.studentId, b.id);
     if (lockError) throw new BookingFailure(lockError);
+    if (day && day.count >= schedule.maxPerDay) throw new BookingFailure("DAY_FULL");
 
     const keep = new Set([newRefs.slot, ...newRefs.instructor, ...newRefs.student].map((r) => r.path));
     deleteOwnedLocks(tx, [oldRefs.slot, ...oldRefs.instructor, ...oldRefs.student], [oldLocks.slot, ...oldLocks.instructor, ...oldLocks.student], b.id, keep);
     writeLocks(tx, newRefs, b.id, b.studentId);
+    if (day) tx.set(day.ref, { touchedAt: FieldValue.serverTimestamp() });
     const patch = {
       date,
       time,

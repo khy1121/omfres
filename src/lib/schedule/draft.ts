@@ -10,6 +10,7 @@ export type ScheduleDraft = {
   meetingUrl: string;
   slotMinutes: string;
   bufferMinutes: string;
+  maxPerDay: string;
   maxBookingsPerStudent: string;
   bookingCloseHours: string;
   cancelCloseHours: string;
@@ -35,6 +36,7 @@ export function draftFromSchedule(s: ScheduleInput): ScheduleDraft {
     meetingUrl: s.meetingUrl,
     slotMinutes: String(s.slotMinutes),
     bufferMinutes: String(s.bufferMinutes ?? 0),
+    maxPerDay: String(s.maxPerDay ?? 0),
     maxBookingsPerStudent: String(s.maxBookingsPerStudent),
     bookingCloseHours: String(s.bookingCloseHours),
     cancelCloseHours: String(s.cancelCloseHours),
@@ -60,6 +62,7 @@ export function emptyDraft(today: string, location: string): ScheduleDraft {
     meetingUrl: "",
     slotMinutes: "30",
     bufferMinutes: "0",
+    maxPerDay: "0",
     maxBookingsPerStudent: "1",
     bookingCloseHours: "0",
     cancelCloseHours: "0",
@@ -84,6 +87,7 @@ export function draftToInput(d: ScheduleDraft) {
     meetingUrl: d.meetingUrl,
     slotMinutes: Number(d.slotMinutes),
     bufferMinutes: Number(d.bufferMinutes),
+    maxPerDay: Number(d.maxPerDay),
     maxBookingsPerStudent: Number(d.maxBookingsPerStudent),
     bookingCloseHours: Number(d.bookingCloseHours),
     cancelCloseHours: Number(d.cancelCloseHours),

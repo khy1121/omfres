@@ -332,6 +332,13 @@ export default function ScheduleForm(props: Props) {
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}회</option>)}
           </select>
         </Field>
+        <Field label="하루 최대 상담 수 (이 일정)" icon="lucide:calendar-check">
+          <select className={inputCls} value={d.maxPerDay} onChange={(e) => set("maxPerDay", e.target.value)}>
+            {[...new Set([0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, Number(d.maxPerDay)])].sort((a, b) => a - b).map((n) => (
+              <option key={n} value={n}>{n === 0 ? "제한 없음" : `${n}회`}</option>
+            ))}
+          </select>
+        </Field>
         <Field label="예약 마감" icon="lucide:clock">
           <select className={inputCls} value={d.bookingCloseHours} onChange={(e) => set("bookingCloseHours", e.target.value)}>
             {HOUR_CHOICES.map((h) => <option key={h.v} value={h.v}>{h.label}</option>)}
