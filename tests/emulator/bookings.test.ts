@@ -14,7 +14,7 @@ const students = Array.from({ length: 20 }, (_, i) => ({ uid: `bk-s${i}`, name: 
 const NOW = kstInstant("2026-12-01", "09:00");
 const DAY = "2026-12-07"; // 월요일
 
-function input(patch: Partial<ScheduleInput> = {}): ScheduleInput {
+function input(patch: { [K in keyof ScheduleInput]?: unknown } = {}): ScheduleInput {
   const r = parseScheduleInput({
     title: "면담",
     description: "",
@@ -247,4 +247,29 @@ test("profile changes update upcoming bookings but keep past and cancelled recor
   assert.equal((await bookings.getBooking(cancelled.id))?.studentName, s.name, "cancelled record kept");
   // 바뀐 것이 없으면 다시 쓰지 않는다
   assert.equal(await bookings.syncStudentOnUpcomingBookings(s.uid, "새이름", "2079999", kstInstant("2027-01-01", "00:00")), 0);
+});
+
+test("bookings follow date overrides: new hours bookable, usual hours refused that day", async () => {
+  const sid = await schedules.createSchedule(
+    courseA,
+    prof.uid,
+    input({
+      recurring: {
+        from: "2026-12-01",
+        to: "2027-03-31",
+        windows: [{ days: [1], start: "10:00", end: "12:00" }],
+        excludeDates: [],
+        overrides: [
+          { date: "2027-03-01", windows: [{ start: "15:00", end: "16:00" }] }, // 월요일 시간 변경
+          { date: "2027-03-06", windows: [{ start: "09:00", end: "09:30" }] }, // 토요일 추가
+        ],
+      },
+    }),
+    "open",
+  );
+  const s = student(18);
+  assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: s, date: "2027-03-01", time: "10:00" })), "INVALID_SLOT", "usual hours replaced");
+  assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: s, date: "2027-03-06", time: "09:00" })), "OK", "added Saturday");
+  const other = student(19);
+  assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: other, date: "2027-03-01", time: "15:30" })), "OK", "override hours");
 });

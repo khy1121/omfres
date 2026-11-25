@@ -181,3 +181,41 @@ test("day slot states mark mine, taken, overlap and closed", () => {
   });
   assert.ok(moving.every((s) => s.available));
 });
+
+test("date overrides replace the weekly windows for that date and can add an off day", () => {
+  const cfg: SlotConfig = {
+    ...recurring,
+    recurring: {
+      ...recurring.recurring!,
+      overrides: [
+        { date: "2026-12-09", windows: [{ start: "14:00", end: "15:00" }] }, // 평소 수 10~12 → 14~15
+        { date: "2026-12-12", windows: [{ start: "10:00", end: "11:00" }, { start: "13:00", end: "13:30" }] }, // 토요일 추가
+      ],
+    },
+  };
+  assert.deepEqual(slotTimesForDate(cfg, "2026-12-09"), ["14:00", "14:30"]);
+  assert.deepEqual(slotTimesForDate(cfg, "2026-12-12"), ["10:00", "10:30", "13:00"]);
+  assert.deepEqual(slotTimesForDate(cfg, "2026-12-16"), ["10:00", "10:30", "11:00", "11:30"], "other Wednesdays unchanged");
+  assert.ok(scheduleDates(cfg).includes("2026-12-12"));
+  assert.equal(countSlots(cfg), countSlots(recurring) - 4 + 2 + 3);
+  // 예전에 저장된 일정(overrides 없음)도 그대로 동작
+  assert.deepEqual(slotTimesForDate({ ...recurring, recurring: { ...recurring.recurring!, overrides: undefined } }, "2026-12-07"), ["10:00", "10:30", "11:00", "11:30"]);
+});
+
+test("override input is validated and normalised", () => {
+  const withOv = (overrides: unknown) => parseScheduleInput({ ...base, recurring: { ...recurring.recurring, overrides } });
+  const ok = withOv([{ date: "2026-12-12", windows: [{ start: "13:00", end: "14:00" }, { start: "10:00", end: "11:00" }] }]);
+  assert.ok("data" in ok, "error" in ok ? ok.error : "");
+  assert.deepEqual(ok.data.recurring?.overrides?.[0].windows.map((w) => w.start), ["10:00", "13:00"], "windows sorted");
+  const bad = (overrides: unknown, re: RegExp) => {
+    const r = withOv(overrides);
+    assert.ok("error" in r, JSON.stringify(overrides));
+    assert.match(r.error, re);
+  };
+  bad([{ date: "2027-02-01", windows: [{ start: "10:00", end: "11:00" }] }], /상담 기간 안/);
+  bad([{ date: "2026-12-02", windows: [{ start: "10:00", end: "11:00" }] }], /제외일/);
+  bad([{ date: "2026-12-09", windows: [] }], /하나 이상/);
+  bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "11:00" }, { start: "10:30", end: "12:00" }] }], /겹칩니다/);
+  bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "10:00" }] }], /종료 시각/);
+  bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "11:00" }] }, { date: "2026-12-09", windows: [{ start: "13:00", end: "14:00" }] }], /두 번/);
+});

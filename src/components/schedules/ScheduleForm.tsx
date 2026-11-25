@@ -15,6 +15,7 @@ import {
   WEEKDAY_NAMES,
 } from "@/lib/schedule/rules";
 import ImpactList, { type ImpactItem } from "./ImpactList";
+import DateOverridesEditor from "./DateOverridesEditor";
 import { draftToInput as toInput, type ScheduleDraft as Draft } from "@/lib/schedule/draft";
 
 type Student = { uid: string; name: string; studentNo: string | null };
@@ -226,6 +227,14 @@ export default function ScheduleForm(props: Props) {
               시간대 추가
             </button>
             <p className="-mt-2 mb-4 text-xs text-neutral-500">종료 시각은 마지막 상담이 끝나야 하는 시각입니다. 같은 요일의 시간대는 겹칠 수 없습니다.</p>
+            <DateOverridesEditor
+              overrides={d.overrides}
+              onChange={(v) => set("overrides", v)}
+              weekly={d.windows}
+              from={d.from}
+              to={d.to}
+              excludeDates={d.excludeDates.split(/[\n,\s]+/).filter(Boolean)}
+            />
             <DateListInput label="제외할 날짜 (휴강일 등)" value={d.excludeDates} onChange={(v) => set("excludeDates", v)} />
           </>
         ) : (
