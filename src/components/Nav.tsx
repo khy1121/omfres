@@ -10,8 +10,11 @@ const links = [
   { href: "/admin", label: "관리자", icon: "lucide:shield" },
 ];
 
-export default function Nav() {
+export default function Nav({ viewer }: { viewer: { name: string } | null }) {
   const path = usePathname();
+  const account = viewer
+    ? { href: "/me", label: viewer.name || "내 정보", icon: "lucide:circle-user" }
+    : { href: "/login", label: "로그인", icon: "lucide:log-in" };
   return (
     <nav className="sticky top-0 z-10 border-b border-neutral-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex min-h-14 max-w-2xl flex-wrap items-center justify-between gap-x-2 px-3 py-1 sm:px-4">
@@ -20,7 +23,7 @@ export default function Nav() {
           상담 예약
         </Link>
         <div className="flex gap-1">
-          {links.map((l) => {
+          {[...links, account].map((l) => {
             const active = path === l.href;
             return (
               <Link
