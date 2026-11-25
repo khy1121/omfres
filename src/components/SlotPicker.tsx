@@ -1,126 +1,130 @@
 "use client";
 
-import { Icon } from "@iconify/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Calendar from "./Calendar";
-import { ErrorBox, StepHeader } from "./ui";
+import { btnPrimary, btnSecondary, ErrorBox, StepHeader } from "./ui";
 import { CONFIG, isDateSelectable, Professor } from "@/lib/config";
-import { fmtDate } from "@/lib/format";
+import { addMinutes, fmtDate } from "@/lib/format";
+import { canChangeReservation } from "@/lib/reservation-time";
 
 type Slot = { time: string; available: boolean };
-
+export type SlotSelection = { date: string; time: string | null };
 type Props = {
   today: string;
   professor: Professor;
-  /** 수정 모드일 때 현재 예약 (해당 슬롯은 선택 가능하게 표시) */
   current?: { date: string; time: string };
-  /** 첫 단계(날짜)에서 뒤로가기를 눌렀을 때. 없으면 버튼 숨김 */
+  selection?: SlotSelection | null;
+  onSelectionChange?: (selection: SlotSelection) => void;
+  stage?: "date" | "time";
+  onStageChange?: (stage: "date" | "time") => void;
   onBack?: () => void;
-  onPick: (date: string, time: string) => void;
-  /** 외부(예: 409 충돌)에서 보여줄 에러 */
+  onPick: (date: string, time: string) => void | Promise<void>;
+  confirmLabel?: string;
+  busy?: boolean;
+  blocked?: boolean;
+  refreshVersion?: number;
   error?: string | null;
 };
 
-export default function SlotPicker({ today, professor, current, onBack, onPick, error }: Props) {
-  const [date, setDate] = useState<string | null>(current?.date ?? null);
-  const [stage, setStage] = useState<"date" | "time">("date");
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+export default function SlotPicker({ today, professor, current, selection, onSelectionChange, stage: controlledStage,
+  onStageChange, onBack, onPick, confirmLabel = "선택한 일정으로 계속", busy = false, blocked = false,
+  refreshVersion = 0, error }: Props) {
+  const [localSelection, setLocalSelection] = useState<SlotSelection | null>(selection ?? current ?? null);
+  const draft = selection === undefined ? localSelection : selection;
+  const [localStage, setLocalStage] = useState<"date" | "time">("date");
+  const stage = controlledStage ?? localStage;
+  const setStage = (next: "date" | "time") => { setLocalStage(next); onStageChange?.(next); };
+  const choose = (next: SlotSelection) => { setLocalSelection(next); onSelectionChange?.(next); };
+  const date = draft?.date ?? null;
+  const time = draft?.time ?? null;
+  const [result, setResult] = useState<{ key: string; slots: Slot[]; error?: string } | null>(null);
+  const [retry, setRetry] = useState(0);
+  const key = `${professor.id}:${date}:${refreshVersion}:${retry}`;
+  const loading = stage === "time" && result?.key !== key;
+  const slots = result?.key === key ? result.slots : [];
+  const loadError = result?.key === key ? result.error : null;
+  const submitting = useRef(false);
 
-  const pickDate = async (d: string) => {
-    setDate(d);
-    setStage("time");
-    setLoading(true);
-    setLoadError(null);
-    setSlots([]);
-    try {
-      const res = await fetch(`/api/slots?professor=${professor.id}&date=${d}`, { cache: "no-store" });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error);
-      setSlots(j.slots ?? []);
-    } catch (e) {
-      setLoadError(e instanceof Error && e.message ? e.message : "시간 정보를 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (stage !== "time" || !date) return;
+    const controller = new AbortController();
+    let active = true;
+    async function load() {
+      try {
+        const response = await fetch(`/api/slots?professor=${encodeURIComponent(professor.id)}&date=${date}`, {
+          cache: "no-store", signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "시간 정보를 불러오지 못했습니다.");
+        if (active) setResult({ key, slots: data.slots ?? [] });
+      } catch (e) {
+        if (active) setResult({ key, slots: [], error: e instanceof Error ? e.message : "시간 정보를 불러오지 못했습니다." });
+      }
     }
-  };
+    void load();
+    return () => { active = false; controller.abort(); };
+  }, [date, professor.id, key, stage]);
 
-  const profLine = (
-    <p className="mb-4 flex items-center gap-1.5 text-sm text-neutral-600">
-      <Icon icon="lucide:graduation-cap" width={16} />
-      {professor.name}
-      {professor.note && <span className="text-neutral-400">· {professor.note}</span>}
-    </p>
-  );
-
-  if (stage === "date") {
-    return (
-      <>
-        <StepHeader title="상담 날짜를 선택하세요" onBack={onBack} />
-        {profLine}
-        <Calendar
-          selected={date}
-          onSelect={pickDate}
-          isSelectable={(d) => isDateSelectable(professor, d, today)}
-          today={today}
-        />
-        <p className="mt-4 flex items-center gap-1.5 text-xs text-neutral-500">
-          <Icon icon="lucide:info" width={14} />
-          상담 가능한 날짜만 선택할 수 있으며, 오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다.
-        </p>
-      </>
-    );
-  }
-
-  const isCurrent = (t: string) => current?.date === date && current?.time === t;
-  const noneAvailable = !loading && slots.length > 0 && slots.every((s) => !s.available && !isCurrent(s.time));
+  const enabled = (s: Slot) => s.available || (
+    current?.date === date && current.time === s.time && canChangeReservation(current));
+  const canConfirm = !!time && slots.some((s) => s.time === time && enabled(s)) &&
+    !(current?.date === date && current.time === time) && !loading && !loadError;
 
   return (
-    <>
-      <StepHeader title="시작 시간을 선택하세요" onBack={() => setStage("date")} />
-      {profLine}
-      <p className="mb-4 flex items-center gap-1.5 text-sm text-neutral-600">
-        <Icon icon="lucide:calendar" width={16} />
-        {date && fmtDate(date)}
-        <span className="text-neutral-300">|</span>
-        <Icon icon="lucide:clock" width={16} />
-        상담 {professor.slotMinutes}분
-      </p>
+    <div aria-busy={busy}>
       {error && <ErrorBox>{error}</ErrorBox>}
-      {loadError && <ErrorBox>{loadError}</ErrorBox>}
-      {loading ? (
-        <p className="flex items-center justify-center gap-2 py-10 text-sm text-neutral-500">
-          <Icon icon="lucide:loader-2" width={18} className="animate-spin" />
-          불러오는 중
-        </p>
-      ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {slots.map((s) => {
-            const mine = isCurrent(s.time);
-            const enabled = s.available || mine;
-            return (
-              <button
-                key={s.time}
-                type="button"
-                disabled={!enabled}
-                onClick={() => date && onPick(date, s.time)}
-                className={[
-                  "rounded-lg border py-2.5 text-sm font-medium transition",
-                  mine
-                    ? "border-neutral-900 bg-neutral-900 text-white"
-                    : enabled
-                      ? "border-neutral-300 text-neutral-900 hover:border-neutral-900 hover:bg-neutral-50"
-                      : "cursor-not-allowed border-neutral-100 text-neutral-300 line-through",
-                ].join(" ")}
-              >
-                {s.time}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {noneAvailable && <p className="mt-5 text-center text-sm text-neutral-500">예약 가능한 시간이 없습니다.</p>}
-    </>
+      <fieldset disabled={busy || blocked} className="min-w-0">
+        <StepHeader title={stage === "date" ? "상담 날짜를 선택하세요" : "시작 시간을 선택하세요"}
+          onBack={stage === "date" ? onBack : () => setStage("date")} />
+        <p className="mb-4 text-sm text-neutral-600">{professor.name} · 상담 {professor.slotMinutes}분</p>
+        {professor.note && <p className="mb-4 text-xs text-neutral-500">{professor.note}</p>}
+        {stage === "date" ? (
+          <>
+            <Calendar selected={date} today={today} isSelectable={(d) => isDateSelectable(professor, d, today)}
+              onSelect={(d) => { choose({ date: d, time: d === date ? time : null }); setStage("time"); }} />
+            <p className="mt-4 text-xs text-neutral-500">오늘부터 {CONFIG.maxDaysAhead}일 이내로 예약할 수 있습니다.</p>
+          </>
+        ) : (
+          <>
+            <p className="mb-4 text-sm">{date && fmtDate(date)}</p>
+            {loading ? <p role="status" className="py-10 text-center text-sm">시간을 불러오는 중</p> : (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {slots.map((s) => (
+                  <button key={s.time} type="button" disabled={!enabled(s)} aria-pressed={time === s.time}
+                    onClick={() => date && choose({ date, time: s.time })}
+                    className={`rounded-lg border py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                      time === s.time ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:border-neutral-900"
+                    }`}>
+                    {s.time}
+                  </button>
+                ))}
+              </div>
+            )}
+            {loadError && <div className="mt-4"><ErrorBox>{loadError}</ErrorBox>
+              <button type="button" onClick={() => setRetry((v) => v + 1)} className={btnSecondary}>다시 불러오기</button>
+            </div>}
+            {!loading && !loadError && slots.every((s) => !enabled(s)) && (
+              <p className="mt-4 text-sm">예약 가능한 시간이 없습니다. 다른 날짜를 선택해주세요.</p>
+            )}
+            {date && time && (
+              <div className="mt-5 rounded-lg bg-neutral-100 p-3 text-sm" aria-live="polite">
+                {current && <p className="mb-2 text-neutral-600">기존 일정: {fmtDate(current.date)} {current.time} ~ {addMinutes(current.time, professor.slotMinutes)}</p>}
+                <p className="font-semibold">{current ? "변경할 일정" : "선택한 일정"}: {fmtDate(date)} {time} ~ {addMinutes(time, professor.slotMinutes)}</p>
+                {current?.date === date && current.time === time && <p className="mt-1">현재 예약과 같습니다. 변경할 시간을 선택해주세요.</p>}
+                {!loading && !loadError && !slots.some((s) => s.time === time && enabled(s)) && <p className="mt-1">선택한 시간은 예약할 수 없습니다. 다른 시간을 선택해주세요.</p>}
+              </div>
+            )}
+            <button type="button" disabled={!canConfirm || busy || blocked} className={`${btnPrimary} mt-4 w-full`}
+              onClick={async () => {
+                if (!date || !time || submitting.current || !canConfirm) return;
+                submitting.current = true;
+                try { await onPick(date, time); } finally { submitting.current = false; }
+              }}>
+              {busy ? "저장 중" : confirmLabel}
+            </button>
+          </>
+        )}
+      </fieldset>
+    </div>
   );
 }

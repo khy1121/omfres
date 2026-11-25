@@ -9,24 +9,29 @@ import { useProfessor, useProfessors } from "./ProfessorsProvider";
 import { Professor } from "@/lib/config";
 import { fmtDate, fmtRange } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
+import { useReservationSave } from "./useReservationSave";
+import { canChangeReservation } from "@/lib/reservation-time";
+import ReservationRecovery from "./ReservationRecovery";
 
 export type EditorMode = { kind: "create" } | { kind: "move"; r: Reservation };
 
 type Props = {
   mode: EditorMode;
   today: string;
+  now: number;
   onCancel: () => void;
   /** 성공 시 호출. 목록 새로고침은 호출자가 담당 */
   onDone: (message: string) => Promise<void>;
 };
 
 /** 관리자용 예약 추가 / 이동 화면 */
-export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
+export default function AdminEditor({ mode, today, now, onCancel, onDone }: Props) {
   const [name, setName] = useState("");
   const [professor, setProfessor] = useState<Professor | null>(null);
   const [stage, setStage] = useState<"name" | "professor" | "slot">(mode.kind === "create" ? "name" : "slot");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const mutation = useReservationSave(async (r) => {
+    await onDone(`${r.name} 학생의 ${fmtDate(r.date)} ${r.time} 예약을 저장했습니다.`);
+  });
 
   const PROFESSORS = useProfessors();
   const moveProfFound = useProfessor(mode.kind === "move" ? mode.r.professorId : "");
@@ -34,52 +39,19 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
 
   const submitCreate = async (date: string, time: string) => {
     if (!professor) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/reservations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ professorId: professor.id, date, time, name: name.trim() }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error);
-      await onDone(`${name.trim()} 학생의 ${professor.name} ${fmtDate(date)} ${time} 예약을 추가했습니다.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "추가에 실패했습니다.");
-    } finally {
-      setBusy(false);
-    }
+    const expected = { professorId: professor.id, date, time, name: name.trim() };
+    await mutation.save({ url: "/api/admin/reservations", method: "POST", body: expected,
+      lookupUrl: "/api/admin/reservations", expected });
   };
 
   const submitMove = async (date: string, time: string) => {
     if (mode.kind !== "move") return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/reservations/${mode.r.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, time }),
-      });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error);
-      await onDone(`${mode.r.name} 학생의 예약을 ${fmtDate(date)} ${time}으로 옮겼습니다.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "이동에 실패했습니다.");
-    } finally {
-      setBusy(false);
-    }
+    await mutation.save({ url: `/api/admin/reservations/${mode.r.id}`, method: "PATCH", body: { date, time },
+      lookupUrl: "/api/admin/reservations", expected: { ...mode.r, date, time } });
   };
 
-  if (busy) {
-    return (
-      <p className="flex items-center justify-center gap-2 py-16 text-sm text-neutral-500">
-        <Icon icon="lucide:loader-2" width={18} className="animate-spin" />
-        저장 중
-      </p>
-    );
-  }
+  const recovery = <ReservationRecovery mutation={mutation} />;
+  const pickerProps = { busy: mutation.busy, blocked: mutation.pending, error: mutation.error, refreshVersion: mutation.refreshVersion };
 
   // ── 이동 ──
   if (mode.kind === "move") {
@@ -101,8 +73,13 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
           current={{ date: mode.r.date, time: mode.r.time }}
           onBack={onCancel}
           onPick={submitMove}
-          error={error}
+          {...pickerProps}
+          blocked={mutation.pending || !canChangeReservation(mode.r, now)}
+          confirmLabel="이 일정으로 변경"
         />
+        {recovery}
+        {!canChangeReservation(mode.r, now) && <ErrorBox>상담 시작 시간이 지나 이동할 수 없습니다.</ErrorBox>}
+        {!mutation.pending && !canChangeReservation(mode.r, now) && <button type="button" onClick={onCancel} className={`${btnPrimary} mt-3`}>목록으로 돌아가기</button>}
       </>
     );
   }
@@ -161,7 +138,8 @@ export default function AdminEditor({ mode, today, onCancel, onDone }: Props) {
       <p className="mb-3 text-sm text-neutral-600">
         학생: <span className="font-semibold text-neutral-900">{name.trim()}</span>
       </p>
-      {professor && <SlotPicker today={today} professor={professor} onBack={() => setStage("professor")} onPick={submitCreate} error={error} />}
+      {professor && <SlotPicker today={today} professor={professor} onBack={() => setStage("professor")} onPick={submitCreate} {...pickerProps} confirmLabel="예약 확정" />}
+      {recovery}
     </>
   );
 }

@@ -6,6 +6,8 @@ import { btnPrimary, btnSecondary } from "./ui";
 import { useProfessors } from "./ProfessorsProvider";
 import { fmtDate, fmtRange, profName, WEEKDAYS } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
+import { canChangeReservation, reservationStatus, reservationStatusLabel } from "@/lib/reservation-time";
+import { findProfessor } from "@/lib/config";
 
 /** 교수님별 흑백 스타일 (범례와 캘린더 칩에 공통 사용). 목록 순서대로 배정 */
 const PROF_STYLES = [
@@ -24,6 +26,7 @@ export function profStyle(profs: { id: string }[], id: string) {
 type Props = {
   rows: Reservation[];
   today: string;
+  now: number;
   /** "all" 이면 교수님 칩 표시, 아니면 해당 교수님만 */
   profFilter: string;
   busy: boolean;
@@ -35,7 +38,7 @@ function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function AdminCalendar({ rows, today, profFilter, busy, onDelete, onMove }: Props) {
+export default function AdminCalendar({ rows, today, now, profFilter, busy, onDelete, onMove }: Props) {
   const PROFESSORS = useProfessors();
   const [ty, tm] = today.split("-").map(Number);
   const [view, setView] = useState({ y: ty, m: tm - 1 });
@@ -189,6 +192,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
                     <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(PROFESSORS, r.professorId)}`}>{profName(PROFESSORS, r.professorId).replace(" 교수님", "")}</span>
                     <span className="font-semibold">{r.name}</span>
                     <span className="text-neutral-600">{fmtRange(PROFESSORS, r.professorId, r.time)}</span>
+                    <span className="text-xs text-neutral-500">{reservationStatusLabel[reservationStatus(r, findProfessor(PROFESSORS, r.professorId)?.slotMinutes, now)]}</span>
                   </span>
                   {confirmId === r.id ? (
                     <span className="flex gap-1">
@@ -209,7 +213,7 @@ export default function AdminCalendar({ rows, today, profFilter, busy, onDelete,
                     </span>
                   ) : (
                     <span className="flex shrink-0">
-                      {r.date >= today && (
+                      {canChangeReservation(r, now) && (
                         <button
                           type="button"
                           onClick={() => onMove(r)}

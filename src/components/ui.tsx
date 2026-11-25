@@ -30,7 +30,7 @@ export function BackButton({ onClick, label = "뒤로" }: { onClick: () => void;
 
 export function ErrorBox({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 flex items-start gap-2 rounded-lg border border-neutral-900 bg-neutral-50 p-3 text-sm text-neutral-900">
+    <div role="alert" className="mb-4 flex items-start gap-2 rounded-lg border border-neutral-900 bg-neutral-50 p-3 text-sm text-neutral-900">
       <Icon icon="lucide:alert-circle" width={18} className="mt-0.5 shrink-0" />
       <span>{children}</span>
     </div>

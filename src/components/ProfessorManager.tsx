@@ -7,6 +7,7 @@ import { useProfessors } from "./ProfessorsProvider";
 import { btnDanger, btnPrimary, btnSecondary, ErrorBox, Field, inputCls } from "./ui";
 import { describeAvailability, Professor } from "@/lib/config";
 import type { Reservation } from "@/lib/store";
+import { canChangeReservation } from "@/lib/reservation-time";
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -51,7 +52,7 @@ type Mode = { kind: "list" } | { kind: "create" } | { kind: "edit"; p: Professor
 const smallInput = `${inputCls} px-2 py-1.5 text-sm`;
 
 /** 관리자 · 상담자(교수님) 프로필과 제약조건 관리 */
-export default function ProfessorManager({ rows, today }: { rows: Reservation[]; today: string }) {
+export default function ProfessorManager({ rows, now }: { rows: Reservation[]; now: number }) {
   const router = useRouter();
   const professors = useProfessors();
   const [mode, setMode] = useState<Mode>({ kind: "list" });
@@ -61,7 +62,7 @@ export default function ProfessorManager({ rows, today }: { rows: Reservation[];
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const upcomingCount = (id: string) => rows.filter((r) => r.professorId === id && r.date >= today).length;
+  const upcomingCount = (id: string) => rows.filter((r) => r.professorId === id && canChangeReservation(r, now)).length;
 
   const open = (m: Mode) => {
     setError(null);
