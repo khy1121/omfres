@@ -273,3 +273,25 @@ test("bookings follow date overrides: new hours bookable, usual hours refused th
   const other = student(19);
   assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: other, date: "2027-03-01", time: "15:30" })), "OK", "override hours");
 });
+
+test("an instructor's buffer keeps consultations apart across schedules, even under concurrency", async () => {
+  const day = "2027-03-08"; // 월요일
+  const rule = (start: string, end: string) => ({ from: "2027-03-01", to: "2027-03-31", windows: [{ days: [1], start, end }], excludeDates: [] });
+  const withRest = await schedules.createSchedule(courseA, prof.uid, input({ bufferMinutes: 10, recurring: rule("10:00", "12:00") }), "open");
+  const plain = await schedules.createSchedule(courseB, prof.uid, input({ recurring: rule("10:00", "12:00") }), "open");
+
+  // 동시에: 여유 10분 일정의 10:00(쉬는 시간 10:40까지)과 다른 수업의 10:30 → 하나만 성공
+  const [a, b] = await Promise.all([
+    codeOf(bookings.createBooking({ scheduleId: withRest, student: student(0), date: day, time: "10:00" })),
+    codeOf(bookings.createBooking({ scheduleId: plain, student: student(1), date: day, time: "10:30" })),
+  ]);
+  assert.deepEqual([a, b].sort(), ["INSTRUCTOR_BUSY", "OK"]);
+
+  if (a === "OK") {
+    // 쉬는 시간이 끝난 뒤(10:40 이후) 시작하는 다른 수업 상담은 가능
+    assert.equal(await codeOf(bookings.createBooking({ scheduleId: plain, student: student(1), date: day, time: "11:00" })), "OK");
+  } else {
+    // 10:30~11:00 예약이 있으면 여유 일정의 10:40 시작도 막힌다
+    assert.equal(await codeOf(bookings.createBooking({ scheduleId: withRest, student: student(0), date: day, time: "10:40" })), "INSTRUCTOR_BUSY");
+  }
+});

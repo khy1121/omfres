@@ -19,7 +19,7 @@ function hoursLabel(h: number, what: string) {
 export function ScheduleDetails({ s, showAdmin, audienceCount }: { s: Schedule; showAdmin?: boolean; audienceCount?: number }) {
   const rows: { icon: string; text: React.ReactNode }[] = [
     { icon: "lucide:calendar-range", text: describeRule(s) },
-    { icon: "lucide:timer", text: `${s.slotMinutes}분 상담` },
+    { icon: "lucide:timer", text: `${s.slotMinutes}분 상담${s.bufferMinutes ? ` · 상담 후 ${s.bufferMinutes}분 여유` : ""}` },
     {
       icon: s.mode === "online" ? "lucide:video" : "lucide:map-pin",
       text: s.mode === "online" ? `온라인${s.location ? ` · ${s.location}` : ""}` : s.location,

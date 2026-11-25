@@ -33,6 +33,7 @@ function toSchedule(id: string, d: FirebaseFirestore.DocumentData): Schedule {
     location: d.location ?? "",
     meetingUrl: d.meetingUrl ?? "",
     slotMinutes: d.slotMinutes,
+    bufferMinutes: d.bufferMinutes ?? 0,
     maxBookingsPerStudent: d.maxBookingsPerStudent ?? 1,
     bookingCloseHours: d.bookingCloseHours ?? 0,
     cancelCloseHours: d.cancelCloseHours ?? 0,

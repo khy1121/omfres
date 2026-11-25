@@ -23,6 +23,8 @@ export type RecurringRule = {
 export type RuleType = "recurring" | "manual";
 export type SlotConfig = {
   slotMinutes: number;
+  /** 상담이 끝난 뒤 교수자가 쉬는 시간(분). 다른 상담을 이 시간 안에 시작할 수 없다 */
+  bufferMinutes?: number;
   ruleType: RuleType;
   recurring: RecurringRule | null;
   /** 직접 지정 슬롯: "YYYY-MM-DD HH:MM" */
@@ -103,7 +105,8 @@ export function slotTimesForDate(cfg: SlotConfig, date: string): string[] {
   const windows = windowsForDate(r, date);
   const times = new Set<string>();
   for (const w of windows) {
-    for (let m = toMin(w.start); m + cfg.slotMinutes <= toMin(w.end); m += cfg.slotMinutes) times.add(toTime(m));
+    // 여유 시간이 있으면 상담 길이 + 여유 시간 간격으로 시작 시각을 만든다 (같은 일정의 연속 상담끼리 막히지 않도록)
+    for (let m = toMin(w.start); m + cfg.slotMinutes <= toMin(w.end); m += cfg.slotMinutes + (cfg.bufferMinutes ?? 0)) times.add(toTime(m));
   }
   return [...times].sort();
 }
@@ -242,6 +245,13 @@ export const scheduleSchema = z
       .min(5, "상담 길이는 5분 이상이어야 합니다.")
       .max(240, "상담 길이는 240분 이하여야 합니다.")
       .refine((n) => n % BLOCK_MINUTES === 0, "상담 길이는 5분 단위로 입력해주세요."),
+    bufferMinutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(120, "여유 시간은 120분 이하로 설정해주세요.")
+      .refine((n) => n % BLOCK_MINUTES === 0, "여유 시간은 5분 단위로 입력해주세요.")
+      .default(0),
     maxBookingsPerStudent: z.number().int().min(1, "1인당 예약 횟수는 1회 이상이어야 합니다.").max(10, "1인당 예약 횟수는 10회 이하여야 합니다."),
     bookingCloseHours: z.number().int().min(0).max(168, "예약 마감은 168시간(7일) 이내로 설정해주세요."),
     cancelCloseHours: z.number().int().min(0).max(168, "취소 마감은 168시간(7일) 이내로 설정해주세요."),
@@ -262,8 +272,8 @@ export const scheduleSchema = z
       if (s.manualSlots.some((x) => toMin(x.slice(11)) + s.slotMinutes > 24 * 60)) fail("상담이 자정을 넘기지 않도록 시작 시각을 정해주세요.");
       const starts = [...new Set(s.manualSlots)].sort().map((x) => kstInstant(x.slice(0, 10), x.slice(11)));
       for (let i = 1; i < starts.length; i++)
-        if (starts[i] - starts[i - 1] < s.slotMinutes * 60_000) {
-          fail("직접 지정한 시간끼리 상담 길이만큼 겹칩니다.");
+        if (starts[i] - starts[i - 1] < (s.slotMinutes + s.bufferMinutes) * 60_000) {
+          fail(s.bufferMinutes ? "직접 지정한 시간끼리 상담 길이와 여유 시간만큼 떨어져 있어야 합니다." : "직접 지정한 시간끼리 상담 길이만큼 겹칩니다.");
           break;
         }
     }
@@ -299,7 +309,8 @@ export function isPastDeadline(startMs: number, hours: number, now: number): boo
   return now >= startMs || now > startMs - hours * 3600_000;
 }
 
-export type BusyInterval = { start: number; end: number; scheduleId: string; studentId: string };
+/** holdEnd: 상담 후 여유 시간까지 포함한 교수자 점유 끝 (없으면 end) */
+export type BusyInterval = { start: number; end: number; holdEnd?: number; scheduleId: string; studentId: string };
 
 export type SlotState = {
   time: string;
@@ -331,11 +342,12 @@ export function daySlotStates(args: {
   return slotTimesForDate(cfg, date).map((time) => {
     const start = kstInstant(date, time);
     const end = start + cfg.slotMinutes * 60_000;
+    const holdEnd = end + (cfg.bufferMinutes ?? 0) * 60_000;
     const base = { time, end: addMinutes(time, cfg.slotMinutes) };
     const mine = myBusy.find((b) => b.scheduleId === scheduleId && b.start === start && b.bookingId !== ignoreBookingId);
     if (mine) return { ...base, available: false, reason: "mine", bookingId: mine.bookingId };
     if (isPastDeadline(start, bookingCloseHours, now)) return { ...base, available: false, reason: "closed" };
-    if (instructorBusy.some((b) => b.bookingId !== ignoreBookingId && b.studentId !== studentId && overlaps(start, end, b.start, b.end))) {
+    if (instructorBusy.some((b) => b.bookingId !== ignoreBookingId && b.studentId !== studentId && overlaps(start, holdEnd, b.start, b.holdEnd ?? b.end))) {
       return { ...base, available: false, reason: "taken" };
     }
     if (myBusy.some((b) => b.bookingId !== ignoreBookingId && overlaps(start, end, b.start, b.end))) {
