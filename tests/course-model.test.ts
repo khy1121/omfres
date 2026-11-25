@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   defaultTerm,
+  effectiveCourseRole,
   inviteStatus,
   isInviteTokenFormat,
   newInviteToken,
@@ -60,4 +61,11 @@ test("invite status covers revoked, rotated, expired and archived links", () => 
   assert.equal(inviteStatus("T", { ...inv, expiresAt: now }, course, now), "expired");
   assert.equal(inviteStatus("T", { ...inv, expiresAt: now + 1 }, course, now), "ok");
   assert.equal(inviteStatus("T", inv, { ...course, archivedAt: 5 }, now), "archived");
+});
+
+test("owner privileges require a current instructor account", () => {
+  assert.equal(effectiveCourseRole("owner", true), "owner");
+  assert.equal(effectiveCourseRole("owner", false), "student", "owner who lost instructor eligibility");
+  assert.equal(effectiveCourseRole("student", true), "student");
+  assert.equal(effectiveCourseRole("student", false), "student");
 });

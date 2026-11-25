@@ -4,6 +4,14 @@ import { z } from "zod";
 
 export type CourseRole = "owner" | "student";
 
+/**
+ * 화면·API에서 실제로 적용할 역할. 그룹 개설자라도 현재 교수 자격(교수 선택 + 학교 계정)이 없으면
+ * 교수자 권한(비공개 일정 보기, 마감 무시 등)을 주지 않는다.
+ */
+export function effectiveCourseRole(role: CourseRole, isInstructor: boolean): CourseRole {
+  return role === "owner" && isInstructor ? "owner" : "student";
+}
+
 export const COURSE_TITLE_MAX = 50;
 export const COURSE_TERM_MAX = 20;
 export const COURSE_DESC_MAX = 500;
