@@ -113,11 +113,37 @@ export async function setScheduleStatus(scheduleId: string, status: ScheduleStat
   await scheduleRef(scheduleId).update({ status, updatedAt: FieldValue.serverTimestamp() });
 }
 
-/** 예정된 예약이 없을 때만 삭제한다 */
-export async function deleteSchedule(scheduleId: string): Promise<"deleted" | "has_bookings"> {
+/**
+ * 예정된 예약이 없을 때만 삭제한다.
+ *
+ * 확인과 삭제 사이에 학생이 예약하는 경합을 막기 위해 먼저 일정을 "마감"으로 바꾼다.
+ * 예약 트랜잭션은 일정 문서를 읽으므로, 상태 변경이 커밋된 뒤의 예약은 재시도되어 거부된다.
+ * 그래서 상태를 바꾼 다음 조회한 예약 목록에는 그 전에 커밋된 예약이 빠짐없이 들어 있다.
+ * 예정 예약이 있으면 원래 상태로 되돌린다.
+ */
+export async function deleteSchedule(scheduleId: string): Promise<"deleted" | "has_bookings" | "not_found"> {
+  const ref = scheduleRef(scheduleId);
+  const previous = await db().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const status = snap.data()!.status as ScheduleStatus;
+    if (status !== "closed") tx.update(ref, { status: "closed", updatedAt: FieldValue.serverTimestamp() });
+    return status;
+  });
+  if (previous === null) return "not_found";
+
   const now = Date.now();
   const booked = await db().collection("bookings").where("scheduleId", "==", scheduleId).where("status", "==", "booked").get();
-  if (booked.docs.some((d) => kstInstant(d.data().date, d.data().time) > now)) return "has_bookings";
-  await scheduleRef(scheduleId).delete();
+  if (booked.docs.some((d) => kstInstant(d.data().date, d.data().time) > now)) {
+    // 삭제하지 않으므로 상태를 되돌린다 (그사이 교수자가 상태를 바꿨다면 그 값을 존중)
+    await db().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists && snap.data()!.status === "closed" && previous !== "closed") {
+        tx.update(ref, { status: previous, updatedAt: FieldValue.serverTimestamp() });
+      }
+    });
+    return "has_bookings";
+  }
+  await ref.delete();
   return "deleted";
 }
