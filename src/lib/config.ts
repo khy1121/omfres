@@ -120,12 +120,27 @@ export function nowTimeKST(): string {
 }
 
 export function isDateSelectable(prof: Professor, date: string, today = todayKST()): boolean {
+  return dateUnavailableReason(prof, date, today) === null;
+}
+
+export function isValidDate(date: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-  if (date < today) return false;
+  const parsed = new Date(date + "T00:00:00Z");
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+}
+
+export function lastBookableDate(today: string): string {
   const limit = new Date(today + "T00:00:00Z");
   limit.setUTCDate(limit.getUTCDate() + CONFIG.maxDaysAhead);
-  if (new Date(date + "T00:00:00Z") > limit) return false;
-  if (prof.excludeDates?.includes(date)) return false;
-  if (prof.onlyDates && !prof.onlyDates.includes(date)) return false;
-  return availabilityFor(prof, date) !== null;
+  return limit.toISOString().slice(0, 10);
+}
+
+export function dateUnavailableReason(prof: Professor, date: string, today = todayKST()): string | null {
+  if (!isValidDate(date)) return "유효하지 않은 날짜";
+  if (date < today) return "지난 날짜";
+  if (date > lastBookableDate(today)) return "예약 가능 기간 밖";
+  if (prof.excludeDates?.includes(date)) return "상담 제외일";
+  if (prof.onlyDates && !prof.onlyDates.includes(date)) return "지정 상담일 아님";
+  if (!generateTimeSlots(prof, date).length) return "상담 운영일 아님";
+  return null;
 }

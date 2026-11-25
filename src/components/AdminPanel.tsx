@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import AdminCalendar, { profStyle } from "./AdminCalendar";
 import AdminEditor, { EditorMode } from "./AdminEditor";
 import ProfessorManager from "./ProfessorManager";
@@ -42,6 +42,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [profFilter, setProfFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [calendarScope, setCalendarScope] = useState<{ month: string; date: string | null }>({ month: today.slice(0, 7), date: null });
   const [editor, setEditor] = useState<EditorMode | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -142,17 +143,24 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
     }
   };
 
-  const exportCsv = () => {
-    const target = profFilter === "all" ? rows : rows.filter((r) => r.professorId === profFilter);
+  const exportCsv = (scope: "current" | "all") => {
+    const target = scope === "all" ? rows : currentResults;
     const sorted = [...target].sort((a, b) => `${a.professorId}${a.date}${a.time}`.localeCompare(`${b.professorId}${b.date}${b.time}`));
-    const suffix = profFilter === "all" ? "전체" : profName(PROFESSORS, profFilter).replace(" 교수님", "");
+    const suffix = scope === "all" ? "전체" : "현재결과";
     downloadCsv(`상담예약_${suffix}_${today}.csv`, reservationsToCsv(PROFESSORS, sorted));
   };
 
   // 학생별 그룹
-  const byStudent = useMemo(() => {
+  const filtered = rows.filter((r) => (tab !== "all" || profFilter === "all" || r.professorId === profFilter) &&
+    (tab !== "student" || r.name.includes(studentQuery.trim())));
+  const visible = filtered.filter((r) => showPast || !isElapsed(r));
+  const currentResults = tab === "all" && viewMode === "calendar"
+    ? visible.filter((r) => calendarScope.date ? r.date === calendarScope.date : r.date.startsWith(calendarScope.month)) : visible;
+  const resultScope = tab === "all" && viewMode === "calendar" ? calendarScope.date ?? calendarScope.month : "검색·필터 결과";
+  const upcomingCount = filtered.filter((r) => status(r) === "upcoming").length;
+  const byStudent = (() => {
     const m = new Map<string, { name: string; items: Reservation[] }>();
-    for (const r of rows) {
+    for (const r of visible) {
       const g = m.get(r.name) ?? { name: r.name, items: [] };
       g.items.push(r);
       m.set(r.name, g);
@@ -161,11 +169,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
     return [...m.entries()]
       .filter(([, g]) => !q || g.name.includes(q))
       .sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows, studentQuery]);
-
-  const filtered = rows.filter((r) => profFilter === "all" || r.professorId === profFilter);
-  const visible = filtered.filter((r) => showPast || !isElapsed(r));
-  const upcomingCount = filtered.filter((r) => status(r) === "upcoming").length;
+  })();
 
   const digitsOnly = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 
@@ -271,13 +275,18 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
   return (
     <div className="mx-auto w-full max-w-5xl">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex max-w-full gap-1 overflow-x-auto rounded-lg border border-neutral-200 bg-white p-1">
-          {tabs.map((t) => (
+        <div className="flex max-w-full flex-wrap gap-3">
+          {[{ label: "예약 관리", keys: ["all", "student"] }, { label: "설정", keys: ["professors", "pin"] }].map((group) => (
+          <div key={group.label} role="group" aria-label={group.label}>
+          <p className="mb-1 text-xs text-neutral-500">{group.label}</p>
+          <div className="flex gap-1 rounded-lg border border-neutral-200 bg-white p-1">
+          {tabs.filter((t) => group.keys.includes(t.key)).map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => setTab(t.key)}
               disabled={editor !== null}
+              aria-pressed={tab === t.key}
               className={[
                 "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition",
                 tab === t.key ? "bg-neutral-900 text-white" : "text-neutral-600 hover:bg-neutral-100",
@@ -287,6 +296,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
               {t.label}
             </button>
           ))}
+          </div></div>))}
         </div>
         <div className="flex flex-wrap gap-1">
           <button
@@ -301,9 +311,12 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             <Icon icon="lucide:plus" width={16} />
             예약 추가
           </button>
-          <button type="button" onClick={exportCsv} disabled={rows.length === 0 || editor !== null} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`} title="엑셀(CSV)로 내려받기">
+          {(tab === "all" || tab === "student") && <button type="button" onClick={() => exportCsv("current")} disabled={currentResults.length === 0 || editor !== null} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`}>
             <Icon icon="lucide:download" width={16} />
-            CSV
+            현재 결과 CSV ({currentResults.length}건)
+          </button>}
+          <button type="button" onClick={() => exportCsv("all")} disabled={rows.length === 0 || editor !== null} className={`${btnSecondary} whitespace-nowrap px-3 py-1.5`} title="검색 조건과 관계없이 지난 예약을 포함한 모든 예약">
+            전체 CSV ({rows.length}건)
           </button>
           <button type="button" onClick={load} disabled={editor !== null} className={`${btnSecondary} px-3 py-1.5`} aria-label="새로고침">
             <Icon icon="lucide:refresh-cw" width={16} className={loading ? "animate-spin" : ""} />
@@ -333,8 +346,9 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
         ) : (
           <>
         {listError && <ErrorBox>{listError}</ErrorBox>}
+        {(tab === "all" || tab === "student") && <p role="status" className="mb-4 text-sm text-neutral-600">현재 결과 {currentResults.length}건 · {resultScope} · {showPast ? "지난 예약 포함" : "지난 예약 제외"}. 전체 CSV는 모든 예약 {rows.length}건을 포함합니다.</p>}
         {notice && (
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+          <div role="status" className="mb-4 flex items-start gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
             <Icon icon="lucide:check-circle" width={18} className="mt-0.5 shrink-0" />
             <span className="flex-1">{notice}</span>
             <button type="button" onClick={() => setNotice(null)} className="shrink-0 opacity-70 hover:opacity-100" aria-label="닫기">
@@ -351,6 +365,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
                   key={p.id}
                   type="button"
                   onClick={() => setProfFilter(p.id)}
+                  aria-pressed={profFilter === p.id}
                   className={[
                     "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-sm transition",
                     profFilter === p.id ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 text-neutral-600 hover:border-neutral-900",
@@ -367,7 +382,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
                 <span className="ml-1 text-sm font-normal text-neutral-500">예정 {upcomingCount}건 / 총 {filtered.length}건</span>
               </h2>
               <div className="flex items-center gap-3">
-                {viewMode === "list" && (
+                {(
                   <label className="flex items-center gap-1.5 text-sm text-neutral-600">
                     <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="accent-neutral-900" />
                     지난 예약 표시
@@ -400,7 +415,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             {loading && rows.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">불러오는 중</p>
             ) : viewMode === "calendar" ? (
-              <AdminCalendar rows={visible} today={today} now={now} profFilter={profFilter} busy={busy} onDelete={remove} onMove={(r) => { setNotice(null); setEditor({ kind: "move", r }); }} />
+              <AdminCalendar rows={visible} today={today} now={now} profFilter={profFilter} busy={busy} scope={calendarScope} onScopeChange={setCalendarScope} onDelete={remove} onMove={(r) => { setNotice(null); setEditor({ kind: "move", r }); }} />
             ) : visible.length === 0 ? (
               <p className="py-10 text-center text-sm text-neutral-500">예약이 없습니다.</p>
             ) : (
@@ -416,12 +431,14 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
         {tab === "student" && (
           <>
             <h2 className="mb-3 text-lg font-bold tracking-tight">학생별 예약</h2>
+            <label className="mb-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} />지난 예약 표시</label>
             <div className="relative mb-4">
               <Icon icon="lucide:search" width={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400" />
               <input
                 value={studentQuery}
                 onChange={(e) => setStudentQuery(e.target.value)}
                 placeholder="이름 검색"
+                aria-label="이름 검색"
                 className={`${inputCls} pl-9`}
               />
             </div>
@@ -430,7 +447,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             ) : (
               <div className="space-y-3">
                 {byStudent.map(([sid, g]) => {
-                  const items = g.items.filter((r) => showPast || !isElapsed(r));
+                  const items = g.items;
                   return (
                     <details key={sid} open={byStudent.length <= 5 || !!studentQuery} className="rounded-xl border border-neutral-200">
                       <summary className="flex cursor-pointer items-center justify-between px-4 py-3">
@@ -451,10 +468,6 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
                 })}
               </div>
             )}
-            <label className="mt-4 flex items-center gap-1.5 text-sm text-neutral-600">
-              <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} className="accent-neutral-900" />
-              지난 예약 표시
-            </label>
           </>
         )}
 
@@ -475,7 +488,7 @@ export default function AdminPanel({ initialAuthed, initialRows, today, initialN
             </Field>
             {pinMsg && (
               pinMsg.ok ? (
-                <div className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+                <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
                   <Icon icon="lucide:check-circle" width={18} />
                   {pinMsg.text}
                 </div>

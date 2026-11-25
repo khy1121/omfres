@@ -32,17 +32,20 @@ type Props = {
   busy: boolean;
   onDelete: (id: string) => Promise<void>;
   onMove: (r: Reservation) => void;
+  scope: { month: string; date: string | null };
+  onScopeChange: (scope: { month: string; date: string | null }) => void;
 };
 
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function AdminCalendar({ rows, today, now, profFilter, busy, onDelete, onMove }: Props) {
+export default function AdminCalendar({ rows, today, now, profFilter, busy, onDelete, onMove, scope, onScopeChange }: Props) {
   const PROFESSORS = useProfessors();
-  const [ty, tm] = today.split("-").map(Number);
-  const [view, setView] = useState({ y: ty, m: tm - 1 });
-  const [selected, setSelected] = useState<string | null>(null);
+  const [y, m] = scope.month.split("-").map(Number);
+  const view = { y, m: m - 1 };
+  const selected = scope.date;
+  const setSelected = (date: string | null) => onScopeChange({ ...scope, date });
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const byDate = useMemo(() => {
@@ -64,8 +67,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
 
   const move = (delta: number) => {
     const d = new Date(Date.UTC(view.y, view.m + delta, 1));
-    setView({ y: d.getUTCFullYear(), m: d.getUTCMonth() });
-    setSelected(null);
+    onScopeChange({ month: ymd(d.getUTCFullYear(), d.getUTCMonth(), 1).slice(0, 7), date: null });
   };
 
   const monthCount = [...byDate.entries()]
@@ -82,7 +84,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
           <Icon icon="lucide:chevron-left" width={20} />
         </button>
         <div className="text-center">
-          <div className="font-semibold tracking-tight">
+          <div aria-live="polite" className="font-semibold tracking-tight">
             {view.y}년 {view.m + 1}월
           </div>
           <div className="text-xs text-neutral-500">이달 {monthCount}건</div>
@@ -124,6 +126,9 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
                 <button
                   key={date}
                   type="button"
+                  aria-label={`${view.y}년 ${view.m + 1}월 ${d}일 ${WEEKDAYS[new Date(date).getUTCDay()]}요일, 예약 ${list.length}건`}
+                  aria-pressed={isSel}
+                  aria-current={isToday ? "date" : undefined}
                   onClick={() => {
                     setSelected(isSel ? null : date);
                     setConfirmId(null);

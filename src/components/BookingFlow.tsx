@@ -8,6 +8,7 @@ import SlotPicker, { SlotSelection } from "./SlotPicker";
 import { useBookingNavigation } from "./useBookingNavigation";
 import { useReservationSave } from "./useReservationSave";
 import ReservationRecovery from "./ReservationRecovery";
+import { useReservationLookup } from "./ProfessorsProvider";
 import { btnPrimary, btnSecondary, Card, ErrorBox, Field, inputCls, StepHeader } from "./ui";
 import { generateTimeSlots, isDateSelectable, Professor } from "@/lib/config";
 import { addMinutes, fmtDate } from "@/lib/format";
@@ -21,7 +22,8 @@ export default function BookingFlow({ today }: { today: string }) {
   const time = selection?.time ?? null;
   const [name, setName] = useState("");
   const navigation = useBookingNavigation();
-  const mutation = useReservationSave(() => navigation.finish(), navigation.setBlocked, () => navigation.back(2, "time"));
+  const lookup = useReservationLookup();
+  const mutation = useReservationSave((saved) => { lookup.setName(saved.name); navigation.finish(); }, navigation.setBlocked, () => navigation.back(2, "time"));
   const step = !professor && navigation.step !== 4 ? 1 : navigation.step === 3 && (!date || !time) ? 2 : navigation.step;
 
   const submit = async (e: { preventDefault(): void }) => {
@@ -67,7 +69,7 @@ export default function BookingFlow({ today }: { today: string }) {
           const active = step === n;
           const done = step > n;
           return (
-            <li key={s.label} className="flex flex-1 items-center last:flex-none">
+            <li key={s.label} aria-current={active ? "step" : undefined} className="flex flex-1 items-center last:flex-none">
               <div className="flex items-center gap-1.5">
                 <span
                   className={[
@@ -150,16 +152,13 @@ export default function BookingFlow({ today }: { today: string }) {
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-white">
               <Icon icon="lucide:check" width={28} />
             </div>
-            <h2 className="mb-3 text-lg font-bold tracking-tight">예약이 완료되었습니다</h2>
+            <StepHeader title="예약이 완료되었습니다" />
             <div className="mb-6 rounded-lg bg-neutral-100 p-4 text-sm">
-              <div className="font-semibold">{professor.name}</div>
               <div className="mt-1 text-neutral-600">{fmtDate(date)}</div>
               <div className="text-base font-semibold">
                 {time} ~ {addMinutes(time, professor.slotMinutes)}
               </div>
-              <div className="mt-1 text-neutral-600">
-                {name}
-              </div>
+              <div className="mt-2 font-semibold">{professor.name}</div>
               {(professor.office || professor.phone) && (
                 <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 border-t border-neutral-200 pt-3 text-xs text-neutral-600">
                   {professor.office && (
@@ -176,15 +175,16 @@ export default function BookingFlow({ today }: { today: string }) {
                   )}
                 </div>
               )}
+              <div className="mt-3 text-neutral-600">예약자: {name}</div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={reset} className={`${btnSecondary} flex-1`}>
                 <Icon icon="lucide:plus" width={16} />
-                새로 예약
+                다른 상담 예약
               </button>
               <Link href="/my" className={`${btnPrimary} flex-1`}>
                 <Icon icon="lucide:list" width={16} />
-                내 예약 보기
+                내 예약 확인
               </Link>
             </div>
           </div>

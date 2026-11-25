@@ -21,8 +21,8 @@ test("new booking conflict shows the error and refreshed slots without losing th
   fireEvent.change(screen.getByRole("textbox", { name: "이름" }), { target: { value: "테스트" } });
   fireEvent.click(screen.getByRole("button", { name: "예약하기" }));
   await screen.findByRole("alert");
-  await waitFor(() => assert.equal((screen.getByRole("button", { name: "10:00" }) as HTMLButtonElement).disabled, true));
-  fireEvent.click(screen.getByRole("button", { name: "09:00" }));
+  await waitFor(() => assert.equal((screen.getByRole("button", { name: /^10:00/ }) as HTMLButtonElement).disabled, true));
+  fireEvent.click(screen.getByRole("button", { name: /^09:00/ }));
   fireEvent.click(screen.getByRole("button", { name: "선택한 일정으로 계속" }));
   assert.equal((screen.getByRole("textbox", { name: "이름" }) as HTMLInputElement).value, "테스트");
 });
@@ -46,7 +46,7 @@ test("a confirmed empty lookup offers an explicit draft-preserving retry after a
   assert.equal(writes, 1);
   fireEvent.click(retry);
   await waitFor(() => assert.equal((screen.getByRole("button", { name: "예약 확정" }) as HTMLButtonElement).disabled, false));
-  assert.equal(screen.getByRole("button", { name: "10:00" }).getAttribute("aria-pressed"), "true");
+  assert.equal(screen.getByRole("button", { name: /^10:00/ }).getAttribute("aria-pressed"), "true");
   assert.equal(writes, 1);
 });
 
@@ -68,7 +68,7 @@ test("admin keeps the selected screen while saving and reconciles a lost respons
   assert.equal(writes, 0);
   fireEvent.click(screen.getByRole("button", { name: "예약 확정" }));
   assert.ok(screen.getByRole("heading", { name: "시작 시간을 선택하세요" }));
-  assert.equal(screen.getByRole("button", { name: "10:00" }).getAttribute("aria-pressed"), "true");
+  assert.equal(screen.getByRole("button", { name: /^10:00/ }).getAttribute("aria-pressed"), "true");
   assert.equal((screen.getByRole("button", { name: "저장 중" }) as HTMLButtonElement).disabled, true);
   await act(async () => rejectSave(new Error("lost response")));
   assert.ok(screen.getByRole("alert").textContent?.includes("처리 결과"));
@@ -94,12 +94,12 @@ test("move conflict keeps selection, displays the error, and refreshes availabil
   fireEvent.change(screen.getByRole("textbox", { name: "이름" }), { target: { value: "테스트" } });
   fireEvent.click(screen.getByRole("button", { name: "조회하기" }));
   fireEvent.click(await screen.findByRole("button", { name: "수정" }));
-  fireEvent.click(screen.getByRole("button", { name: "24" }));
-  fireEvent.click(await screen.findByRole("button", { name: "10:00" }));
+  fireEvent.click(screen.getByRole("button", { name: /2099.*9.*24.*/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /^10:00/ }));
   assert.equal(writes, 0);
   fireEvent.click(screen.getByRole("button", { name: "이 일정으로 변경" }));
   await waitFor(() => assert.ok(screen.getByRole("alert").textContent?.includes("이미 예약")));
   await waitFor(() => assert.ok(reads >= 2));
-  assert.equal(screen.getByRole("button", { name: "10:00" }).getAttribute("aria-pressed"), "true");
+  assert.equal(screen.getByRole("button", { name: /^10:00/ }).getAttribute("aria-pressed"), "true");
   assert.equal((screen.getByRole("button", { name: "이 일정으로 변경" }) as HTMLButtonElement).disabled, true);
 });
