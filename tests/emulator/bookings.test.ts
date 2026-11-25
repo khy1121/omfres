@@ -2,6 +2,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import "./guard";
+import { joinAsStudent } from "./seed";
 import * as courses from "../../src/lib/data/courses";
 import * as schedules from "../../src/lib/data/schedules";
 import * as bookings from "../../src/lib/data/bookings";
@@ -55,8 +56,8 @@ before(async () => {
   const tokA = (await courses.getCourse(courseA))!.currentInvite!.token;
   const tokB = (await courses.getCourse(courseB))!.currentInvite!.token;
   for (const s of students) {
-    await courses.joinByInvite(tokA, s);
-    await courses.joinByInvite(tokB, s);
+    await joinAsStudent(tokA, s);
+    await joinAsStudent(tokB, s);
   }
 });
 
@@ -95,7 +96,7 @@ test("overlapping slots in two courses of the same instructor: only one can be b
 test("a student cannot hold two overlapping bookings across instructors", async () => {
   const other = { uid: "bk-prof2", name: "이교수", email: "p2@hansung.ac.kr", studentNo: null };
   const courseC = await courses.createCourse(other, { title: "네트워크", term: "2026년 2학기", description: "" });
-  await courses.joinByInvite((await courses.getCourse(courseC))!.currentInvite!.token, students[5]);
+  await joinAsStudent((await courses.getCourse(courseC))!.currentInvite!.token, students[5]);
   const s1 = await schedules.createSchedule(courseA, prof.uid, input(), "open");
   const s2 = await schedules.createSchedule(courseC, other.uid, input(), "open");
   assert.equal(await codeOf(bookings.createBooking({ scheduleId: s1, student: student(5), date: "2026-12-28", time: "11:00", now: NOW })), "OK");

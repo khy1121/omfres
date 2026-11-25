@@ -1,6 +1,7 @@
 import "server-only";
 import { FieldValue, Timestamp, type DocumentReference, type Transaction } from "firebase-admin/firestore";
 import { db } from "../firebase/admin";
+import { userRef } from "./users";
 import {
   inviteStatus,
   newInviteToken,
@@ -192,7 +193,9 @@ export async function previewInvite(token: string) {
   return readInvite(token, (r) => r.get());
 }
 
-export type JoinResult = { ok: true; courseId: string; already: boolean } | { ok: false; status: Exclude<InviteStatus, "ok"> };
+export type JoinResult =
+  | { ok: true; courseId: string; already: boolean }
+  | { ok: false; status: Exclude<InviteStatus, "ok"> | "not_student" };
 
 /** 초대 링크로 학생 참여. 이미 멤버면 그대로 성공 처리 */
 export async function joinByInvite(token: string, student: Person): Promise<JoinResult> {
@@ -200,8 +203,12 @@ export async function joinByInvite(token: string, student: Person): Promise<Join
   const result = await db().runTransaction(async (tx): Promise<JoinResult> => {
     const { status, course } = await readInvite(token, (r) => tx.get(r));
     if (status !== "ok" || !course) return { ok: false, status: status === "ok" ? "not_found" : status };
-    const existing = await tx.get(memberRef(course.id, student.uid));
+    // 계정 유형은 트랜잭션 안에서 다시 확인한다. 아래에서 사용자 문서에도 쓰기 때문에
+    // 동시에 진행 중인 계정 유형 변경(data/users.saveProfileGuarded)과 반드시 직렬화된다.
+    const [existing, user] = await tx.getAll(memberRef(course.id, student.uid), userRef(student.uid));
     if (existing.exists) return { ok: true, courseId: course.id, already: true };
+    if (user.data()?.accountType !== "student") return { ok: false, status: "not_student" };
+    tx.set(userRef(student.uid), { membershipsUpdatedAt: FieldValue.serverTimestamp() }, { merge: true });
     addMember(tx, course.id, student, "student");
     return { ok: true, courseId: course.id, already: false };
   });
