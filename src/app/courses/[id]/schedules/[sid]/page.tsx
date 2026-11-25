@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import ScheduleAdmin from "@/components/schedules/ScheduleAdmin";
 import StudentSchedulePanel from "@/components/schedules/StudentSchedulePanel";
 import { ScheduleDetails, STATUS_BADGE } from "@/components/schedules/ScheduleSummary";
 import { BackLink } from "@/components/courses/BackLink";
@@ -6,7 +7,7 @@ import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { getCourseAccess } from "@/lib/data/courses";
 import { getScheduleInCourse, isScheduleVisible } from "@/lib/data/schedules";
-import { listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
+import { listBookingsForSchedule, listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
 import { kstToday } from "@/lib/kst";
 
 export const dynamic = "force-dynamic";
@@ -55,14 +56,13 @@ export default async function SchedulePage({
   );
 
   if (isOwner) {
+    const bookings = await listBookingsForSchedule(schedule.id);
     return (
       <main className="px-4 py-8">
         <div className="mx-auto max-w-2xl space-y-4">
           {header}
           {details}
-          <Card>
-            <p className="text-sm text-neutral-500">예약 현황과 일정 관리 화면은 다음 업데이트에서 제공됩니다.</p>
-          </Card>
+          <ScheduleAdmin courseId={id} scheduleId={sid} title={schedule.title} status={schedule.status} cfg={cfg} today={today} now={now} bookings={bookings} />
         </div>
       </main>
     );

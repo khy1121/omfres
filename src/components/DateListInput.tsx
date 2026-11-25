@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { isValidDate } from "@/lib/config";
+import { isValidDate } from "@/lib/schedule/rules";
 import { btnSecondary, ErrorBox, inputCls } from "./ui";
 
 export default function DateListInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
@@ -13,7 +13,7 @@ export default function DateListInput({ label, value, onChange }: { label: strin
     <label htmlFor={id} className="mb-1.5 block text-sm font-medium">{label}</label>
     <div className="flex gap-2">
       <input id={id} type="date" value={draft} onChange={(e) => { setDraft(e.target.value); setError(null); }} className={`${inputCls} min-w-0`} />
-      <button type="button" className={btnSecondary} onClick={() => {
+      <button type="button" className={`${btnSecondary} shrink-0 whitespace-nowrap`} onClick={() => {
         if (!isValidDate(draft)) { setError("추가할 날짜를 선택해주세요."); return; }
         if (dates.includes(draft)) { setError("이미 추가한 날짜입니다."); return; }
         onChange([...dates, draft].sort().join("\n")); setDraft(""); setError(null);
