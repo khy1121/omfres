@@ -23,7 +23,7 @@ export default function DateListInput({ label, value, onChange }: { label: strin
     <ul aria-label={`${label} 목록`} className="mt-2 space-y-1">
       {dates.map((date, index) => <li key={`${date}-${index}`} className="flex items-center justify-between rounded-lg bg-neutral-100 px-2 py-1 text-sm">
         <span>{date}{!isValidDate(date) && " · 잘못된 날짜"}</span>
-        <button type="button" aria-label={`${label} ${date} 제거`} className="rounded px-2 py-1" onClick={() => onChange(dates.filter((_, i) => i !== index).join("\n"))}>제거</button>
+        <button type="button" aria-label={`${label} ${date} 제거`} className="min-h-11 min-w-11 rounded px-2 py-1" onClick={() => onChange(dates.filter((_, i) => i !== index).join("\n"))}>제거</button>
       </li>)}
     </ul>
     {!dates.length && <p className="mt-2 text-xs text-neutral-500">선택한 날짜 없음</p>}

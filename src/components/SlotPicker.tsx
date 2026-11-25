@@ -94,7 +94,7 @@ export default function SlotPicker({ today, professor, current, selection, onSel
                   <button key={s.time} type="button" disabled={!enabled(s)} aria-pressed={time === s.time}
                     aria-label={enabled(s) ? s.time : `${s.time} ${s.reason === "past" ? "지난 시간" : s.reason === "booked" ? "예약 마감" : "예약 불가"}`}
                     onClick={() => date && choose({ date, time: s.time })}
-                    className={`rounded-lg border py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    className={`min-h-11 rounded-lg border py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
                       time === s.time ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-300 hover:border-neutral-900"
                     }`}>
                     {s.time}

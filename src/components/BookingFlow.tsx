@@ -50,20 +50,18 @@ export default function BookingFlow({ today }: { today: string }) {
 
   const summary = professor && date && time && (
     <div className="mb-5 rounded-lg bg-neutral-100 p-3 text-sm">
-      <div className="flex items-center gap-1.5 font-semibold">
-        <Icon icon="lucide:graduation-cap" width={16} />
-        {professor.name}
-      </div>
-      <div className="mt-1 text-neutral-600">{fmtDate(date)}</div>
-      <div className="font-semibold">
+      <div className="font-medium">{fmtDate(date)}</div>
+      <div className="mt-1 text-lg font-bold tabular-nums">
         {time} ~ {addMinutes(time, professor.slotMinutes)}
       </div>
+      <div className="mt-2 text-neutral-600">{professor.name}{professor.office ? ` · ${professor.office}` : ""}</div>
     </div>
   );
 
   return (
     <div className="mx-auto w-full max-w-md">
-      <ol className="mb-6 flex items-center text-xs">
+      <p className="mb-4 text-sm font-semibold sm:hidden" aria-live="polite">{step === 4 ? "예약 완료" : `${step}/3 · ${steps[step - 1].label}`}</p>
+      <ol aria-label="예약 진행 단계" className="mb-6 hidden items-center text-xs sm:flex">
         {steps.map((s, i) => {
           const n = (i + 1) as Step;
           const active = step === n;

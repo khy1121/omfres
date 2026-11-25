@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useProfessors } from "./ProfessorsProvider";
-import { btnPrimary, btnSecondary, ErrorBox, Field, inputCls, StepHeader } from "./ui";
+import { btnDanger, btnPrimary, btnSecondary, ErrorBox, successCls, Field, inputCls, StepHeader } from "./ui";
 import DateListInput from "./DateListInput";
 import { validateProfessorInput } from "@/lib/professor-input";
 import { scheduleImpact } from "@/lib/schedule-impact";
@@ -169,7 +169,7 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
         </div>
         {error && <ErrorBox>{error}</ErrorBox>}
         {notice && (
-          <div role="status" className="mb-4 flex items-center gap-2 rounded-lg bg-neutral-900 p-3 text-sm text-white">
+          <div role="status" className={successCls}>
             <Icon icon="lucide:check-circle" width={18} />
             <span className="flex-1">{notice}</span>
             <button type="button" onClick={() => setNotice(null)} className="opacity-70 hover:opacity-100" aria-label="닫기">
@@ -185,11 +185,11 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
               const n = upcomingCount(p.id);
               return (
                 <li key={p.id} className="rounded-xl border border-neutral-200 px-4 py-3">
-                  <div className="flex items-start gap-3">
+                  <div className="flex flex-wrap items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white">
                       <Icon icon="lucide:graduation-cap" width={20} />
                     </span>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 break-words">
                       <div className="font-semibold">{p.name}</div>
                       <div className="text-sm text-neutral-600">{describeAvailability(p)}</div>
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-neutral-500">
@@ -229,7 +229,7 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
                         <button type="button" onClick={() => setConfirmId(null)} className={`${btnSecondary} px-3 py-1.5`}>
                           아니오
                         </button>
-                        <button type="button" disabled={busy} onClick={() => remove(p)} className={`${btnPrimary} px-3 py-1.5`}>
+                        <button type="button" disabled={busy} onClick={() => remove(p)} className={`${btnDanger} px-3 py-1.5`}>
                           삭제
                         </button>
                       </div>
@@ -238,7 +238,7 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
                         <button
                           type="button"
                           onClick={() => open({ kind: "edit", p })}
-                          className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                          className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
                           aria-label="수정"
                           title="수정"
                         >
@@ -250,7 +250,7 @@ export default function ProfessorManager({ rows, now }: { rows: Reservation[]; n
                             setNotice(null);
                             setConfirmId(p.id);
                           }}
-                          className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                          className="min-h-11 min-w-11 rounded-lg p-2 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
                           aria-label="삭제"
                           title="삭제"
                         >

@@ -49,7 +49,7 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
   };
   const isCurrentOrPastMonth = view.y < ty || (view.y === ty && view.m <= tm - 1);
 
-  const navBtn = "rounded-lg p-1.5 transition hover:bg-neutral-100 disabled:opacity-25 disabled:hover:bg-transparent";
+  const navBtn = "flex min-h-11 min-w-11 items-center justify-center rounded-lg p-1.5 transition hover:bg-neutral-100 disabled:opacity-25 disabled:hover:bg-transparent";
 
   return (
     <div ref={root} className="select-none">

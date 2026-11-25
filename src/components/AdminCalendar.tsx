@@ -2,7 +2,7 @@
 
 import { Icon } from "@iconify/react";
 import { useMemo, useState } from "react";
-import { btnPrimary, btnSecondary } from "./ui";
+import { btnDanger, btnSecondary } from "./ui";
 import { useProfessors } from "./ProfessorsProvider";
 import { fmtDate, fmtRange, profName, WEEKDAYS } from "@/lib/format";
 import type { Reservation } from "@/lib/store";
@@ -75,7 +75,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
     .reduce((n, [, l]) => n + l.length, 0);
 
   const selectedRows = selected ? (byDate.get(selected) ?? []) : [];
-  const navBtn = "rounded-lg p-1.5 transition hover:bg-neutral-100";
+  const navBtn = "flex min-h-11 min-w-11 items-center justify-center rounded-lg p-1.5 transition hover:bg-neutral-100";
 
   return (
     <div>
@@ -192,7 +192,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
           ) : (
             <ul className="space-y-2">
               {selectedRows.map((r) => (
-                <li key={r.id} className="flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
+                <li key={r.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-sm">
                   <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className={`shrink-0 rounded border px-1.5 py-0.5 text-xs ${profStyle(PROFESSORS, r.professorId)}`}>{profName(PROFESSORS, r.professorId).replace(" 교수님", "")}</span>
                     <span className="font-semibold">{r.name}</span>
@@ -211,7 +211,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
                           await onDelete(r.id);
                           setConfirmId(null);
                         }}
-                        className={`${btnPrimary} px-2.5 py-1 text-xs`}
+                        className={`${btnDanger} px-2.5 py-1 text-xs`}
                       >
                         삭제
                       </button>
@@ -222,7 +222,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
                         <button
                           type="button"
                           onClick={() => onMove(r)}
-                          className="rounded-md p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                          className="min-h-11 min-w-11 rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
                           aria-label="예약 옮기기"
                           title="옮기기"
                         >
@@ -232,7 +232,7 @@ export default function AdminCalendar({ rows, today, now, profFilter, busy, onDe
                       <button
                         type="button"
                         onClick={() => setConfirmId(r.id)}
-                        className="rounded-md p-1.5 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-900"
+                        className="min-h-11 min-w-11 rounded-md p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-neutral-900"
                         aria-label="예약 삭제"
                         title="삭제"
                       >
