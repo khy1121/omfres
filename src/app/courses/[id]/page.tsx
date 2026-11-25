@@ -7,6 +7,7 @@ import LeaveButton from "@/components/courses/LeaveButton";
 import { BackLink } from "@/components/courses/BackLink";
 import BookingItem from "@/components/schedules/BookingItem";
 import { ScheduleCard } from "@/components/schedules/ScheduleSummary";
+import { btnPrimary } from "@/components/styles";
 import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { countStudents, getCourseAccess } from "@/lib/data/courses";
@@ -123,6 +124,10 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
               <Icon icon="lucide:calendar-days" width={18} />
               상담 일정
             </h2>
+            <Link href={`/courses/${course.id}/schedules/new`} className={`${btnPrimary} min-h-10 px-3 py-1.5`}>
+              <Icon icon="lucide:plus" width={16} />
+              새 일정
+            </Link>
           </div>
           {schedules.length ? (
             <ul className="space-y-2">
@@ -138,7 +143,7 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
             </ul>
           ) : (
             <Card>
-              <p className="text-sm text-neutral-500">아직 만든 상담 일정이 없습니다. 일정 등록 화면은 다음 업데이트에서 제공됩니다.</p>
+              <p className="text-sm text-neutral-500">아직 만든 상담 일정이 없습니다. 상담 가능한 기간과 시간대를 정해 일정을 열어보세요.</p>
             </Card>
           )}
         </section>

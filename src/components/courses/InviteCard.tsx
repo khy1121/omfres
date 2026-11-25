@@ -90,7 +90,7 @@ export default function InviteCard({ courseId, invite, expired }: Props) {
 
       <div className="mt-5 border-t border-neutral-200 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="flex items-center gap-2 text-sm text-neutral-700">
+          <label className="flex shrink-0 items-center gap-2 whitespace-nowrap text-sm text-neutral-700">
             만료
             <select className={`${inputCls} w-auto py-2`} value={expiry} onChange={(e) => setExpiry(e.target.value as "" | "7" | "30")}>
               <option value="">없음</option>
