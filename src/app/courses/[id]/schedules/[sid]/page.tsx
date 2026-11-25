@@ -7,7 +7,7 @@ import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { getCourseAccess } from "@/lib/data/courses";
 import { getScheduleInCourse, isScheduleVisible } from "@/lib/data/schedules";
-import { listBookingsForSchedule, listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
+import { listBookingsForInstructor, listBookingsForSchedule, listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
 import { kstToday } from "@/lib/kst";
 import { effectiveCourseRole } from "@/lib/courses/model";
 
@@ -33,7 +33,7 @@ export default async function SchedulePage({
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const today = kstToday(now);
-  const cfg = { slotMinutes: schedule.slotMinutes, ruleType: schedule.ruleType, recurring: schedule.recurring, manualSlots: schedule.manualSlots };
+  const cfg = { slotMinutes: schedule.slotMinutes, bufferMinutes: schedule.bufferMinutes, maxPerDay: schedule.maxPerDay, ruleType: schedule.ruleType, recurring: schedule.recurring, manualSlots: schedule.manualSlots };
 
   const header = (
     <header className="mb-4">
@@ -59,13 +59,17 @@ export default async function SchedulePage({
   );
 
   if (isOwner) {
-    const bookings = await listBookingsForSchedule(schedule.id);
+    const [bookings, all] = await Promise.all([listBookingsForSchedule(schedule.id), listBookingsForInstructor(schedule.instructorId)]);
+    // 주간 보기에 같이 보여줄 다른 일정 예약 (학생 정보는 넘기지 않는다)
+    const otherBookings = all
+      .filter((b) => b.scheduleId !== schedule.id)
+      .map(({ id, scheduleId, date, time, endTime, courseTitle, scheduleTitle }) => ({ id, scheduleId, date, time, endTime, courseTitle, scheduleTitle }));
     return (
       <main className="px-4 py-8">
         <div className="mx-auto max-w-2xl space-y-4">
           {header}
           {details}
-          <ScheduleAdmin courseId={id} scheduleId={sid} title={schedule.title} status={schedule.status} cfg={cfg} today={today} now={now} bookings={bookings} />
+          <ScheduleAdmin courseId={id} scheduleId={sid} title={schedule.title} status={schedule.status} cfg={cfg} today={today} now={now} bookings={bookings} otherBookings={otherBookings} />
         </div>
       </main>
     );
