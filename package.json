@@ -16,7 +16,7 @@
     "@iconify/react": "^6.0.2",
     "firebase": "^13.4.0",
     "firebase-admin": "^14.5.1",
-    "next": "16.3.4",
+    "next": "^16.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
@@ -30,7 +30,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "^16.4.6",
     "firebase-tools": "^15.37.0",
     "jsdom": "^28.1.0",
     "tailwindcss": "^4",
@@ -38,6 +38,9 @@
     "typescript": "^5"
   },
   "overrides": {
-    "jwks-rsa": "3.2.2"
+    "jwks-rsa": "3.2.2",
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "1.14.7"
+    }
   }
 }
