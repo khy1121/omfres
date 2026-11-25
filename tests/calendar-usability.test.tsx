@@ -162,3 +162,34 @@ test("if the counts cannot be loaded, dates stay selectable by the schedule rule
   assert.equal(day.getAttribute("aria-disabled"), "false");
   assert.equal(screen.queryByText("날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다."), null);
 });
+
+test("picking the earliest time selects that date and time, even in a later month", async () => {
+  const calls = mockFetch((c) => {
+    if (c.url.includes("/availability")) return Response.json({ days: { "2099-10-14": 2 }, next: { date: "2099-10-14", time: "10:30" } });
+    if (c.url.includes("/slots")) return slotsResponse(["10:00"]);
+    return Response.json({ booking: { ...booking, date: "2099-10-14", time: "10:30" } });
+  });
+  const done: unknown[] = [];
+  render(<BookingPicker courseId="c" scheduleId="s" cfg={cfg} today="2099-09-23" onDone={(b) => done.push(b)} />);
+  const quick = await screen.findByRole("button", { name: /가장 빠른 상담 2099년 10월 14일 .* 10:30 선택/ });
+  fireEvent.click(quick);
+  assert.ok(screen.getByText("2099년 10월"), "calendar jumped to October");
+  assert.equal(screen.getByRole("button", { name: /^2099년 10월 14일 수요일/ }).getAttribute("aria-pressed"), "true");
+  assert.equal((await screen.findByRole("button", { name: "10:30~11:00 예약 가능" })).getAttribute("aria-pressed"), "true");
+  assert.ok(screen.getByText("선택됨"));
+  fireEvent.click(screen.getByRole("button", { name: "이 시간으로 예약" }));
+  await waitFor(() => assert.equal(done.length, 1));
+  assert.deepEqual(calls.find((c) => c.method === "POST")?.body, { scheduleId: "s", date: "2099-10-14", time: "10:30" });
+});
+
+test("the shortcut is labelled for moving and hidden when nothing is left", async () => {
+  mockFetch((c) => (c.url.includes("/availability") ? Response.json({ days: {}, next: null }) : slotsResponse()));
+  const { unmount } = render(<BookingPicker courseId="c" scheduleId="s" cfg={cfg} today="2099-09-23" onDone={() => {}} />);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(screen.queryByRole("button", { name: /가장 빠른/ }), null);
+  unmount();
+
+  mockFetch((c) => (c.url.includes("/availability") ? Response.json({ days: { "2099-09-24": 1 }, next: { date: "2099-09-24", time: "11:00" } }) : slotsResponse()));
+  render(<BookingPicker courseId="c" scheduleId="s" cfg={cfg} today="2099-09-23" moving={{ bookingId: "b1", date: "2099-09-24", time: "10:30" }} onDone={() => {}} />);
+  assert.ok(await screen.findByRole("button", { name: /가장 빠른 변경 가능 시간 .* 11:00 선택/ }));
+});
