@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import { WEEKDAY_NAMES as WEEKDAYS } from "@/lib/schedule/rules";
 
 type Props = {
@@ -22,11 +22,30 @@ function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+/** 키보드 이동 목표 날짜 (APG 날짜 선택 기준). 해당 키가 아니면 null */
+export function keyTarget(date: string, key: string, shift: boolean): string | null {
+  const [y, m, d] = date.split("-").map(Number);
+  const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const days: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: -dow, End: 6 - dow };
+  if (key in days) {
+    const next = new Date(`${date}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + days[key]);
+    return next.toISOString().slice(0, 10);
+  }
+  if (key !== "PageUp" && key !== "PageDown") return null;
+  // PageUp/PageDown: 한 달, Shift와 함께: 한 해. 같은 날짜가 없으면 그 달 마지막 날
+  const months = (key === "PageUp" ? -1 : 1) * (shift ? 12 : 1);
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  return ymd(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d, last));
+}
+
 export default function Calendar({ selected, onSelect, isSelectable, unavailableReason, today, max, start, note }: Props) {
   const initial = selected ?? (start && start > today ? start : today);
   const [focusDate, setFocusDate] = useState(initial);
   const focusRequested = useRef(false);
   const root = useRef<HTMLDivElement>(null);
+  const hintId = useId();
   const [ty, tm] = today.split("-").map(Number);
   const [iy, im] = initial.split("-").map(Number);
   const [view, setView] = useState({ y: iy, m: im - 1 });
@@ -69,7 +88,7 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
           <Icon icon="lucide:chevron-right" width={20} />
         </button>
       </div>
-      <p className="mb-2 text-xs text-neutral-500">방향키로 날짜 이동 · Enter로 선택</p>
+      <p id={hintId} className="mb-2 text-xs text-neutral-500">방향키로 날짜 이동 · PageUp/PageDown으로 달 이동 · Enter로 선택</p>
       <div aria-hidden="true" className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-neutral-500">
         {WEEKDAYS.map((w) => (
           <div key={w} className="py-1">
@@ -77,7 +96,7 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
           </div>
         ))}
       </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div role="group" aria-label={`${view.y}년 ${view.m + 1}월`} aria-describedby={hintId} className="mt-1 grid grid-cols-7 gap-1">
         {cells.map((d, i) => {
           if (d === null) return <div key={i} />;
           const date = ymd(view.y, view.m, d);
@@ -101,17 +120,16 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
               onFocus={() => setFocusDate(date)}
               onClick={() => { if (ok) onSelect(date); }}
               onKeyDown={(event) => {
-                const dow = new Date(date).getUTCDay();
-                const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: -dow, End: 6 - dow };
-                if (!(event.key in offsets)) return;
+                const target = keyTarget(date, event.key, event.shiftKey);
+                if (!target) return;
                 event.preventDefault();
-                const next = new Date(`${date}T00:00:00Z`);
-                next.setUTCDate(next.getUTCDate() + offsets[event.key]);
-                const value = next.toISOString().slice(0, 10);
-                if (value < today || value > max) return;
+                // 범위 밖이면 끝 날짜에서 멈춘다 (한 달 이동이 막히지 않게)
+                const value = target < today ? today : target > max ? max : target;
+                if (value === date) return;
+                const [vy, vm] = value.split("-").map(Number);
                 focusRequested.current = true;
                 setFocusDate(value);
-                setView({ y: next.getUTCFullYear(), m: next.getUTCMonth() });
+                setView({ y: vy, m: vm - 1 });
               }}
               className={[
                 "min-h-12 rounded-lg px-0.5 py-2 text-sm transition",
