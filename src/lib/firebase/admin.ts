@@ -2,6 +2,7 @@ import "server-only";
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { normalizePrivateKey } from "./private-key";
 
 // 서버 전용 Firebase Admin. 브라우저는 Firestore에 직접 접근하지 않고 모든 데이터는 이 모듈을 거친다.
 // FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST가 있으면 Admin SDK가 자동으로 에뮬레이터를 사용한다.
@@ -18,7 +19,7 @@ function app(): App {
     return initializeApp({ projectId });
   }
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY);
   if (!clientEmail || !privateKey) throw new Error("FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY 환경변수가 없습니다.");
 
   return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }), projectId });
