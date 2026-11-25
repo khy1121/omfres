@@ -229,3 +229,21 @@ test("deleting while students book never leaves bookings on a deleted schedule",
     for (const b of booked) await bookings.cancelBooking({ bookingId: b.id, actor: { uid: prof.uid, as: "instructor" } });
   }
 });
+
+test("profile changes update upcoming bookings but keep past and cancelled records", async () => {
+  const sid = await schedules.createSchedule(courseA, prof.uid, input({ maxBookingsPerStudent: 3 }), "open");
+  const s = student(17);
+  // 과거 시점(NOW)에 예약한 것처럼 만든 '지난 상담'
+  const past = await bookings.createBooking({ scheduleId: sid, student: s, date: "2026-12-28", time: "10:00", now: NOW });
+  const upcoming = await bookings.createBooking({ scheduleId: sid, student: s, date: "2027-02-15", time: "10:00" });
+  const cancelled = await bookings.createBooking({ scheduleId: sid, student: s, date: "2027-02-15", time: "11:00" });
+  await bookings.cancelBooking({ bookingId: cancelled.id, actor: { uid: s.uid, as: "student" } });
+
+  const n = await bookings.syncStudentOnUpcomingBookings(s.uid, "새이름", "2079999", kstInstant("2027-01-01", "00:00"));
+  assert.equal(n, 1);
+  assert.deepEqual([(await bookings.getBooking(upcoming.id))?.studentName, (await bookings.getBooking(upcoming.id))?.studentNo], ["새이름", "2079999"]);
+  assert.equal((await bookings.getBooking(past.id))?.studentName, s.name, "past record kept");
+  assert.equal((await bookings.getBooking(cancelled.id))?.studentName, s.name, "cancelled record kept");
+  // 바뀐 것이 없으면 다시 쓰지 않는다
+  assert.equal(await bookings.syncStudentOnUpcomingBookings(s.uid, "새이름", "2079999", kstInstant("2027-01-01", "00:00")), 0);
+});
