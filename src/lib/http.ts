@@ -11,9 +11,12 @@ export function jsonError(message: string, status: number, code?: string) {
 export function isSameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  // 프록시를 여러 단계 거치면 "a.com, b.com"처럼 값이 이어붙는다. 클라이언트가 요청한 첫 번째 호스트를 쓴다.
+  const forwarded = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = (forwarded || request.headers.get("host") || "").toLowerCase();
+  if (!host) return false;
   try {
-    return new URL(origin).host === host;
+    return new URL(origin).host.toLowerCase() === host;
   } catch {
     return false;
   }
