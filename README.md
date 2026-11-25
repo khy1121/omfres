@@ -61,7 +61,9 @@ npm run build
 
 ## 배포 (Vercel)
 
-1. Vercel 프로젝트 환경변수에 `.env.example`의 항목을 모두 등록합니다. `FIREBASE_PRIVATE_KEY`는 비밀값입니다.
+1. Vercel 프로젝트 환경변수에 `.env.example`의 항목을 **Production과 Preview 모두** 등록합니다.
+   - `FIREBASE_PRIVATE_KEY`(비밀값)는 PEM 원문, 따옴표로 감싼 한 줄(`\n` 포함), 서비스 계정 JSON 전체 중 어느 형태로 넣어도 됩니다.
+   - `INSTRUCTOR_EMAIL_DOMAINS`가 비어 있으면 아무도 교수를 선택할 수 없습니다 (서버 로그에 경고가 남습니다).
 2. Firebase 콘솔 → Authentication → 설정 → **승인된 도메인**에 배포 도메인을 추가합니다.
 3. (선택) `npx firebase deploy --only firestore:rules`로 보안 규칙을 배포합니다. 프로덕션 모드로 만든 DB는 기본적으로 모두 막혀 있어 동작에는 영향이 없습니다.
-4. 기존 Upstash Redis 연결과 `ADMIN_PIN`·`ADMIN_SECRET`·`KV_*`·`UPSTASH_*` 환경변수는 더 이상 쓰지 않으므로 제거해도 됩니다.
+4. 환경변수를 바꾼 뒤에는 재배포해야 적용됩니다.

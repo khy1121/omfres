@@ -22,6 +22,17 @@ export function isInstructorEligible(email: string | null | undefined, emailVeri
   return domain !== null && domains.includes(domain);
 }
 
-export function instructorDomains(): string[] {
-  return parseDomains(process.env.INSTRUCTOR_EMAIL_DOMAINS);
+let warnedMissing = false;
+
+/**
+ * 교수 선택 가능 도메인. 비어 있으면 아무도 교수를 선택할 수 없으므로(안전한 쪽으로 막힘)
+ * 설정 누락을 알아챌 수 있도록 서버 로그에 한 번 경고한다.
+ */
+export function instructorDomains(env: Record<string, string | undefined> = process.env, warn: (msg: string) => void = console.warn): string[] {
+  const domains = parseDomains(env.INSTRUCTOR_EMAIL_DOMAINS);
+  if (!domains.length && !warnedMissing) {
+    warnedMissing = true;
+    warn("[auth] INSTRUCTOR_EMAIL_DOMAINS가 비어 있어 아무도 교수 계정을 선택할 수 없습니다. 배포 환경변수를 확인하세요.");
+  }
+  return domains;
 }
