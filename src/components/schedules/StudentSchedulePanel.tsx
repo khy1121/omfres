@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import BookingPicker from "./BookingPicker";
 import BookingItem from "./BookingItem";
+import AddToCalendarButton from "./AddToCalendarButton";
 import { btnPrimary, btnSecondary, Card, successCls } from "@/components/ui";
 import { fmtDateKo, type SlotConfig } from "@/lib/schedule/rules";
 import type { Booking } from "@/lib/data/bookings";
@@ -47,6 +48,10 @@ export default function StudentSchedulePanel({ courseId, scheduleId, cfg, today,
             {b.scheduleTitle} · {b.mode === "online" ? "온라인" : b.location}
           </div>
         </div>
+        <AddToCalendarButton booking={b} className={`${btnSecondary} w-full border-[1.5px] border-neutral-900 font-bold`} />
+        <p className="mb-5 mt-2 text-xs text-neutral-600">
+          휴대폰·Google·Outlook 캘린더에 일정을 넣습니다. 지원하는 캘린더 앱에서는 하루 전 알림도 함께 설정됩니다.
+        </p>
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
           <Link href="/bookings" className={`${btnPrimary} sm:flex-1`}>내 예약 보기</Link>
           <button type="button" onClick={() => { setDone(null); setBooking(false); setMoveId(null); router.refresh(); }} className={btnSecondary}>

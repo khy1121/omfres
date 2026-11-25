@@ -9,6 +9,7 @@ import { btnDanger, btnSecondary, ErrorBox } from "@/components/ui";
 import { fmtDateKo, isPastDeadline, kstInstant } from "@/lib/schedule/rules";
 import type { Booking } from "@/lib/data/bookings";
 import { bookingPhase, type BookingPhase } from "@/lib/schedule/phase";
+import AddToCalendarButton from "./AddToCalendarButton";
 
 const PHASE: Record<BookingPhase, { label: string; cls: string }> = {
   upcoming: { label: "예정", cls: "bg-neutral-900 text-white" },
@@ -43,6 +44,8 @@ export default function BookingItem({ booking: b, now, viewAs, cancelCloseHours 
   const canChange =
     b.status === "booked" && (viewAs === "instructor" ? now < start : !isPastDeadline(start, cancelCloseHours, now));
   const canCancel = b.status === "booked" && (viewAs === "instructor" || canChange);
+  // 학생의 예정·진행 중 예약은 변경·취소 마감이 지나도 캘린더에 추가할 수 있다
+  const showCalendar = viewAs === "student" && (phase === "upcoming" || phase === "ongoing");
 
   const cancel = async () => {
     setBusy(true);
@@ -102,8 +105,11 @@ export default function BookingItem({ booking: b, now, viewAs, cancelCloseHours 
 
       {error && <div className="mt-3"><ErrorBox>{error}</ErrorBox></div>}
 
-      {(canChange || canCancel) && !confirming && (
+      {(canChange || canCancel || showCalendar) && !confirming && (
         <div className="mt-3 flex flex-wrap gap-2">
+          {showCalendar && (
+            <AddToCalendarButton booking={b} label="캘린더에 추가" className={`${btnSecondary} min-h-10 border-[1.5px] border-neutral-900 px-3 py-1.5 font-bold`} />
+          )}
           {canChange && moveHref && (
             <Link href={moveHref} className={`${btnSecondary} min-h-10 px-3 py-1.5`}>시간 변경</Link>
           )}
