@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Calendar from "@/components/Calendar";
 import { callApi } from "@/components/api";
 import { btnPrimary, btnSecondary, ErrorBox } from "@/components/ui";
-import { dateUnavailableReason, fmtDateKo, scheduleRange, type SlotConfig, type SlotState } from "@/lib/schedule/rules";
+import { dateUnavailableReason, fmtDateKo, scheduleRange, type AvailabilitySummary, type SlotConfig, type SlotState } from "@/lib/schedule/rules";
 import type { Booking } from "@/lib/data/bookings";
 
 type Props = {
@@ -55,6 +55,25 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
       alive = false;
     };
   }, [date, key, courseId, scheduleId, movingId]);
+
+  // 기간 전체의 날짜별 남은 수 (달력 표시용). 실패하면 표시만 생략하고 날짜는 규칙대로 고를 수 있다.
+  const [summary, setSummary] = useState<{ version: number; data: AvailabilitySummary } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const q = movingId ? `?${new URLSearchParams({ booking: movingId })}` : "";
+    callApi<AvailabilitySummary>(`/api/courses/${courseId}/schedules/${scheduleId}/availability${q}`, "GET").then((r) => {
+      if (alive && r.ok && r.data && typeof r.data.days === "object" && r.data.days) setSummary({ version, data: r.data });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [version, courseId, scheduleId, movingId]);
+  const days = summary?.data.days ?? null;
+
+  const ruleReason = (d: string) => dateUnavailableReason(cfg, d, today);
+  const isSelectable = (d: string) => ruleReason(d) === null && (!days || (days[d] ?? 0) > 0);
+  const unavailableReason = (d: string) => ruleReason(d) ?? (days && !days[d] ? "마감" : null);
+  const note = (d: string) => (days && days[d] ? { text: `${days[d]}개`, label: `예약 가능 시간 ${days[d]}개` } : null);
 
   const current = result && result.key === key ? result : null;
   const slots = current && "slots" in current ? current.slots : null;
@@ -117,9 +136,11 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
         start={range.first}
         max={range.last}
         onSelect={pickDate}
-        isSelectable={(d) => dateUnavailableReason(cfg, d, today) === null}
-        unavailableReason={(d) => dateUnavailableReason(cfg, d, today)}
+        isSelectable={isSelectable}
+        unavailableReason={unavailableReason}
+        note={note}
       />
+      {days && <p className="mt-2 text-xs text-neutral-500">날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다.</p>}
 
       {date && (
         <section className="mt-6" aria-labelledby="slots-heading">

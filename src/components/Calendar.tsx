@@ -14,13 +14,15 @@ type Props = {
   max: string;
   /** 선택 전 처음 보여줄 날짜 (예: 첫 상담일) */
   start?: string;
+  /** 선택 가능한 날짜 아래에 보여줄 짧은 안내. text: 화면 표시(예: "3개"), label: 화면 낭독용 */
+  note?: (date: string) => { text: string; label: string } | null;
 };
 
 function ymd(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
-export default function Calendar({ selected, onSelect, isSelectable, unavailableReason, today, max, start }: Props) {
+export default function Calendar({ selected, onSelect, isSelectable, unavailableReason, today, max, start, note }: Props) {
   const initial = selected ?? (start && start > today ? start : today);
   const [focusDate, setFocusDate] = useState(initial);
   const focusRequested = useRef(false);
@@ -83,6 +85,8 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
           const isSel = selected === date;
           const isToday = date === today;
           const reason = ok ? null : unavailableReason?.(date) ?? "예약 불가";
+          const extra = ok ? note?.(date) ?? null : null;
+          const status = reason ?? (extra ? `선택 가능, ${extra.label}` : "선택 가능");
           return (
             <button
               key={date}
@@ -92,8 +96,8 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
               aria-disabled={!ok}
               aria-pressed={isSel}
               aria-current={isToday ? "date" : undefined}
-              aria-label={`${view.y}년 ${view.m + 1}월 ${d}일 ${WEEKDAYS[new Date(date).getUTCDay()]}요일${isToday ? ", 오늘" : ""}, ${reason ?? "선택 가능"}`}
-              title={reason ?? "선택 가능"}
+              aria-label={`${view.y}년 ${view.m + 1}월 ${d}일 ${WEEKDAYS[new Date(date).getUTCDay()]}요일${isToday ? ", 오늘" : ""}, ${status}`}
+              title={status}
               onFocus={() => setFocusDate(date)}
               onClick={() => { if (ok) onSelect(date); }}
               onKeyDown={(event) => {
@@ -121,6 +125,11 @@ export default function Calendar({ selected, onSelect, isSelectable, unavailable
             >
               {d}
               {reason && <span className="mt-0.5 block text-[10px] leading-tight">{reason}</span>}
+              {extra && (
+                <span aria-hidden="true" className={`mt-0.5 block text-[10px] font-semibold leading-tight ${isSel ? "text-neutral-200" : "text-emerald-700"}`}>
+                  {extra.text}
+                </span>
+              )}
             </button>
           );
         })}

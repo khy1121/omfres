@@ -345,6 +345,51 @@ export function daySlotStates(args: {
   });
 }
 
+export type AvailabilitySummary = {
+  /** 날짜별 지금 예약할 수 있는 시간 수 (오늘 이후 상담이 있는 날만) */
+  days: Record<string, number>;
+  /** 가장 빠른 예약 가능 시간 */
+  next: { date: string; time: string } | null;
+};
+
+/**
+ * 일정 전체 기간의 날짜별 예약 가능 시간 수와 가장 빠른 시간.
+ * 날짜별 판정은 daySlotStates와 같은 규칙을 써서 시간 목록과 어긋나지 않는다.
+ * @param instructorBusyByDate / myBusyByDate 날짜("YYYY-MM-DD")별 예약 목록
+ */
+export function availabilitySummary(args: {
+  cfg: SlotConfig;
+  scheduleId: string;
+  studentId: string;
+  today: string;
+  instructorBusyByDate: Map<string, (BusyInterval & { bookingId: string })[]>;
+  myBusyByDate: Map<string, (BusyInterval & { bookingId: string })[]>;
+  bookingCloseHours: number;
+  now: number;
+  ignoreBookingId?: string | null;
+}): AvailabilitySummary {
+  const days: Record<string, number> = {};
+  let next: AvailabilitySummary["next"] = null;
+  for (const date of scheduleDates(args.cfg)) {
+    if (date < args.today) continue;
+    const states = daySlotStates({
+      cfg: args.cfg,
+      scheduleId: args.scheduleId,
+      date,
+      studentId: args.studentId,
+      instructorBusy: args.instructorBusyByDate.get(date) ?? [],
+      myBusy: args.myBusyByDate.get(date) ?? [],
+      bookingCloseHours: args.bookingCloseHours,
+      now: args.now,
+      ignoreBookingId: args.ignoreBookingId,
+    });
+    const open = states.filter((s) => s.available);
+    days[date] = open.length;
+    if (!next && open.length) next = { date, time: open[0].time };
+  }
+  return { days, next };
+}
+
 /** 기간·제외일 문자열 등 화면 표시용 요약 */
 export function describeRule(cfg: SlotConfig): string {
   if (cfg.ruleType === "manual") {

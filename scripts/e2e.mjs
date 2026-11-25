@@ -208,6 +208,17 @@ await step("슬롯 조회에 내 예약·마감이 반영된다", async () => {
   assert.equal(theirs.slots.find((s) => s.time === "10:00").reason, "taken");
   assert.equal(theirs.slots.find((s) => s.time === "10:30").available, true);
 });
+await step("날짜별 남은 수와 가장 빠른 시간이 실제 예약을 반영한다", async () => {
+  const loser = S.slice(0, 5).find((s) => s !== winner);
+  const a = await api(loser, "GET", `/api/courses/${courseId}/schedules/${open}/availability`);
+  assert.equal(a.status, 200, a.text);
+  assert.equal(a.json.days[MON], 3, "10:00 taken, 3 of 4 left on Monday");
+  assert.deepEqual(a.json.next, { date: MON, time: "10:30" });
+  assert.equal(a.json.days[TUE], 2, "Tuesday 14:00~15:00 untouched");
+  const mine = await api(winner, "GET", `/api/courses/${courseId}/schedules/${open}/availability`);
+  assert.equal(mine.json.days[MON], 3, "own booking is not counted as bookable");
+  assert.equal((await api(S[5], "GET", `/api/courses/${courseId}/schedules/${open}/availability`)).status, 404, "non-members are refused");
+});
 await step("1인당 횟수를 넘기면 거부된다", async () => {
   const r = await api(winner, "POST", "/api/bookings", { scheduleId: open, date: MON, time: "11:00" });
   assert.equal(r.status, 409);

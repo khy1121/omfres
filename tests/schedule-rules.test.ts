@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  availabilitySummary,
   countSlots,
   dateUnavailableReason,
   daySlotStates,
@@ -218,4 +219,35 @@ test("override input is validated and normalised", () => {
   bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "11:00" }, { start: "10:30", end: "12:00" }] }], /겹칩니다/);
   bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "10:00" }] }], /종료 시각/);
   bad([{ date: "2026-12-09", windows: [{ start: "10:00", end: "11:00" }] }, { date: "2026-12-09", windows: [{ start: "13:00", end: "14:00" }] }], /두 번/);
+});
+
+test("availability summary counts bookable times per date and finds the earliest one", () => {
+  const at = (date: string, t: string, mins = 30) => ({ start: kstInstant(date, t), end: kstInstant(date, t) + mins * 60_000 });
+  const instructorBusyByDate = new Map([
+    ["2026-12-03", [{ ...at("2026-12-03", "14:00"), scheduleId: "S", studentId: "x", bookingId: "a" }, { ...at("2026-12-03", "14:30"), scheduleId: "S", studentId: "y", bookingId: "b" }]],
+    ["2026-12-07", [{ ...at("2026-12-07", "10:00"), scheduleId: "S", studentId: "me", bookingId: "mine" }]],
+  ]);
+  const myBusyByDate = new Map([["2026-12-07", [{ ...at("2026-12-07", "10:00"), scheduleId: "S", studentId: "me", bookingId: "mine" }]]]);
+  const s = availabilitySummary({
+    cfg: recurring, scheduleId: "S", studentId: "me", today: "2026-12-03",
+    instructorBusyByDate, myBusyByDate, bookingCloseHours: 0, now: kstInstant("2026-12-03", "09:00"),
+  });
+  assert.equal(s.days["2026-12-03"], 0, "both Thursday slots taken");
+  assert.equal(s.days["2026-12-07"], 3, "my own booking is not counted as bookable");
+  assert.equal(s.days["2026-12-02"], undefined, "past and excluded dates are omitted");
+  assert.deepEqual(s.next, { date: "2026-12-07", time: "10:30" });
+
+  // 이동 중인 예약 자신은 비어 있는 것으로 본다
+  const moving = availabilitySummary({
+    cfg: recurring, scheduleId: "S", studentId: "me", today: "2026-12-03",
+    instructorBusyByDate, myBusyByDate, bookingCloseHours: 0, now: kstInstant("2026-12-03", "09:00"), ignoreBookingId: "mine",
+  });
+  assert.equal(moving.days["2026-12-07"], 4);
+  assert.deepEqual(moving.next, { date: "2026-12-07", time: "10:00" });
+
+  const none = availabilitySummary({
+    cfg: recurring, scheduleId: "S", studentId: "me", today: "2027-01-01",
+    instructorBusyByDate, myBusyByDate, bookingCloseHours: 0, now: kstInstant("2027-01-01", "09:00"),
+  });
+  assert.deepEqual(none, { days: {}, next: null });
 });
