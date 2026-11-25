@@ -295,3 +295,27 @@ test("an instructor's buffer keeps consultations apart across schedules, even un
     assert.equal(await codeOf(bookings.createBooking({ scheduleId: withRest, student: student(0), date: day, time: "10:40" })), "INSTRUCTOR_BUSY");
   }
 });
+
+test("a daily cap holds when many students book different times of the same day at once", async () => {
+  const day = "2027-03-15"; // 월요일
+  const sid = await schedules.createSchedule(
+    courseA,
+    prof.uid,
+    input({ maxPerDay: 2, recurring: { from: "2027-03-01", to: "2027-03-31", windows: [{ days: [1], start: "13:00", end: "16:00" }], excludeDates: [] } }),
+    "open",
+  );
+  const times = ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30"];
+  const results = await Promise.all(times.map((t, i) => codeOf(bookings.createBooking({ scheduleId: sid, student: student(i), date: day, time: t }))));
+  assert.equal(results.filter((r) => r === "OK").length, 2, JSON.stringify(results));
+  assert.ok(results.filter((r) => r !== "OK").every((r) => r === "DAY_FULL"));
+  // 다른 날은 영향 없음
+  assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: student(6), date: "2027-03-22", time: "13:00" })), "OK");
+  // 학생이 다른 날에서 꽉 찬 날로 옮기는 것은 거부, 교수자는 옮길 수 있다
+  const other = (await bookings.listBookingsForSchedule(sid)).find((b) => b.date === "2027-03-22")!;
+  assert.equal(await codeOf(bookings.moveBooking({ bookingId: other.id, actor: { uid: students[6].uid, as: "student" }, date: day, time: "15:30" })), "DAY_FULL");
+  assert.equal(await codeOf(bookings.moveBooking({ bookingId: other.id, actor: { uid: prof.uid, as: "instructor" }, date: day, time: "15:30" })), "OK");
+  // 하나를 취소하면 다시 예약할 수 있다 (교수자가 옮긴 건까지 3건 → 2건으로 줄여야 함)
+  const booked = (await bookings.listBookingsForSchedule(sid)).filter((b) => b.date === day && b.status === "booked");
+  for (const b of booked.slice(0, 2)) await bookings.cancelBooking({ bookingId: b.id, actor: { uid: prof.uid, as: "instructor" } });
+  assert.equal(await codeOf(bookings.createBooking({ scheduleId: sid, student: student(7), date: day, time: "13:00" })), "OK");
+});

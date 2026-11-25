@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const today = kstToday(now);
   const busy = await upcomingBusyByDate(c.schedule.instructorId, c.studentId, today);
   const summary = availabilitySummary({
-    cfg: c.schedule,
+    cfg: c.cfg,
     scheduleId: c.schedule.id,
     studentId: c.studentId,
     today,

@@ -25,6 +25,8 @@ export type SlotConfig = {
   slotMinutes: number;
   /** 상담이 끝난 뒤 교수자가 쉬는 시간(분). 다른 상담을 이 시간 안에 시작할 수 없다 */
   bufferMinutes?: number;
+  /** 이 일정의 하루 최대 상담 수 (0 또는 없음 = 제한 없음) */
+  maxPerDay?: number;
   ruleType: RuleType;
   recurring: RecurringRule | null;
   /** 직접 지정 슬롯: "YYYY-MM-DD HH:MM" */
@@ -252,6 +254,7 @@ export const scheduleSchema = z
       .max(120, "여유 시간은 120분 이하로 설정해주세요.")
       .refine((n) => n % BLOCK_MINUTES === 0, "여유 시간은 5분 단위로 입력해주세요.")
       .default(0),
+    maxPerDay: z.number().int().min(0).max(100, "하루 최대 상담 수는 100회 이하로 설정해주세요.").default(0),
     maxBookingsPerStudent: z.number().int().min(1, "1인당 예약 횟수는 1회 이상이어야 합니다.").max(10, "1인당 예약 횟수는 10회 이하여야 합니다."),
     bookingCloseHours: z.number().int().min(0).max(168, "예약 마감은 168시간(7일) 이내로 설정해주세요."),
     cancelCloseHours: z.number().int().min(0).max(168, "취소 마감은 168시간(7일) 이내로 설정해주세요."),
@@ -317,7 +320,7 @@ export type SlotState = {
   end: string;
   available: boolean;
   /** mine: 이 일정의 내 예약, taken: 다른 사람이 예약(또는 교수 다른 일정과 겹침), overlap: 내 다른 예약과 겹침, closed: 마감 시간 지남 */
-  reason: "mine" | "taken" | "overlap" | "closed" | null;
+  reason: "mine" | "taken" | "overlap" | "closed" | "full" | null;
   bookingId?: string;
 };
 
@@ -339,6 +342,9 @@ export function daySlotStates(args: {
   ignoreBookingId?: string | null;
 }): SlotState[] {
   const { cfg, scheduleId, date, studentId, instructorBusy, myBusy, bookingCloseHours, now, ignoreBookingId } = args;
+  // 하루 최대에 도달했으면 내 예약 외에는 모두 마감 (이동 중인 예약 자신은 세지 않음)
+  const dayCount = instructorBusy.filter((b) => b.scheduleId === scheduleId && b.bookingId !== ignoreBookingId).length;
+  const dayFull = !!cfg.maxPerDay && dayCount >= cfg.maxPerDay;
   return slotTimesForDate(cfg, date).map((time) => {
     const start = kstInstant(date, time);
     const end = start + cfg.slotMinutes * 60_000;
@@ -347,6 +353,7 @@ export function daySlotStates(args: {
     const mine = myBusy.find((b) => b.scheduleId === scheduleId && b.start === start && b.bookingId !== ignoreBookingId);
     if (mine) return { ...base, available: false, reason: "mine", bookingId: mine.bookingId };
     if (isPastDeadline(start, bookingCloseHours, now)) return { ...base, available: false, reason: "closed" };
+    if (dayFull) return { ...base, available: false, reason: "full" };
     if (instructorBusy.some((b) => b.bookingId !== ignoreBookingId && b.studentId !== studentId && overlaps(start, holdEnd, b.start, b.holdEnd ?? b.end))) {
       return { ...base, available: false, reason: "taken" };
     }

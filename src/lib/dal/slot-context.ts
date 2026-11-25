@@ -10,6 +10,8 @@ export type SlotContext = {
   viewer: Viewer;
   role: CourseRole;
   schedule: Schedule;
+  /** 슬롯 계산에 쓸 일정 설정 (교수자가 옮길 때는 하루 최대를 적용하지 않음 — 예약 트랜잭션과 같은 기준) */
+  cfg: Schedule;
   /** 슬롯 상태를 계산할 학생 (예약 이동이면 그 예약의 학생) */
   studentId: string;
   /** 이동 중인 예약 (자기 자신과의 겹침은 무시) */
@@ -44,6 +46,7 @@ export async function slotContext(request: Request, courseId: string, scheduleId
     viewer: g.viewer,
     role,
     schedule,
+    cfg: role === "owner" ? { ...schedule, maxPerDay: 0 } : schedule,
     studentId,
     ignoreBookingId,
     bookingCloseHours: role === "owner" ? 0 : schedule.bookingCloseHours,

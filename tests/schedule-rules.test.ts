@@ -290,3 +290,22 @@ test("buffer input is validated and manual slots must leave room for it", () => 
   assert.ok("error" in tooClose && /여유 시간/.test(tooClose.error));
   assert.ok("data" in parseScheduleInput({ ...manual, manualSlots: ["2026-12-10 09:00", "2026-12-10 09:40"] }));
 });
+
+test("a daily cap closes the rest of the day once reached, not counting the booking being moved", () => {
+  const capped: SlotConfig = { ...recurring, maxPerDay: 2 };
+  const date = "2026-12-07";
+  const at = (t: string) => ({ start: kstInstant(date, t), end: kstInstant(date, t) + 30 * 60_000 });
+  const busy = [
+    { ...at("10:00"), scheduleId: "S", studentId: "a", bookingId: "b1" },
+    { ...at("10:30"), scheduleId: "S", studentId: "me", bookingId: "mine" },
+    { ...at("11:00"), scheduleId: "OTHER", studentId: "c", bookingId: "x" }, // 다른 일정은 세지 않음
+  ];
+  const full = daySlotStates({ cfg: capped, scheduleId: "S", date, studentId: "me", instructorBusy: busy, myBusy: [busy[1]], bookingCloseHours: 0, now: 0 });
+  assert.deepEqual(full.map((s) => [s.time, s.reason]), [["10:00", "full"], ["10:30", "mine"], ["11:00", "full"], ["11:30", "full"]]);
+  const moving = daySlotStates({ cfg: capped, scheduleId: "S", date, studentId: "me", instructorBusy: busy, myBusy: [busy[1]], bookingCloseHours: 0, now: 0, ignoreBookingId: "mine" });
+  assert.equal(moving.find((s) => s.time === "11:30")?.available, true, "moving my own booking within the day is allowed");
+  const r = parseScheduleInput({ ...base, maxPerDay: 3 });
+  assert.ok("data" in r && r.data.maxPerDay === 3);
+  const d = parseScheduleInput(base);
+  assert.ok("data" in d && d.data.maxPerDay === 0, "no cap by default");
+});

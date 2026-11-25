@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { instructorBusy, myBusy } = await busyOnDate(c.schedule.instructorId, c.studentId, date);
   const slots = daySlotStates({
-    cfg: c.schedule,
+    cfg: c.cfg,
     scheduleId: c.schedule.id,
     date,
     studentId: c.studentId,

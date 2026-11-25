@@ -26,6 +26,7 @@ const REASON_LABEL: Record<NonNullable<SlotState["reason"]>, string> = {
   taken: "마감",
   overlap: "내 다른 예약과 겹침",
   closed: "예약 마감 시간 지남",
+  full: "하루 상담 마감",
 };
 
 export default function BookingPicker({ courseId, scheduleId, cfg, today, moving, onDone, onCancel }: Props) {

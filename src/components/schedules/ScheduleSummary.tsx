@@ -24,7 +24,7 @@ export function ScheduleDetails({ s, showAdmin, audienceCount }: { s: Schedule; 
       icon: s.mode === "online" ? "lucide:video" : "lucide:map-pin",
       text: s.mode === "online" ? `온라인${s.location ? ` · ${s.location}` : ""}` : s.location,
     },
-    { icon: "lucide:repeat", text: `1인당 ${s.maxBookingsPerStudent}회 예약 · ${hoursLabel(s.bookingCloseHours, "예약")} · ${hoursLabel(s.cancelCloseHours, "변경·취소")}` },
+    { icon: "lucide:repeat", text: `1인당 ${s.maxBookingsPerStudent}회 예약${s.maxPerDay ? ` · 하루 최대 ${s.maxPerDay}회` : ""} · ${hoursLabel(s.bookingCloseHours, "예약")} · ${hoursLabel(s.cancelCloseHours, "변경·취소")}` },
   ];
   if (showAdmin) {
     rows.push({ icon: "lucide:users", text: s.audience === "all" ? "그룹 전체 학생에게 공개" : `선택한 학생 ${audienceCount ?? s.audienceIds.length}명에게만 공개` });
