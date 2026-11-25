@@ -193,3 +193,39 @@ test("busyOnDate returns instructor-wide and personal bookings for slot states",
   assert.ok(instructorBusy.length >= 1);
   assert.ok(myBusy.every((b) => b.studentId === students[14].uid));
 });
+
+test("deleting a schedule with upcoming bookings is refused and the schedule reopens", async () => {
+  const sid = await schedules.createSchedule(courseA, prof.uid, input(), "open");
+  await bookings.createBooking({ scheduleId: sid, student: student(16), date: "2027-02-01", time: "10:00" });
+  assert.equal(await schedules.deleteSchedule(sid), "has_bookings");
+  assert.equal((await schedules.getScheduleInCourse(courseA, sid))?.status, "open", "status restored");
+
+  const empty = await schedules.createSchedule(courseA, prof.uid, input(), "draft");
+  assert.equal(await schedules.deleteSchedule(empty), "deleted");
+  assert.equal(await schedules.getScheduleInCourse(courseA, empty), null);
+  assert.equal(await schedules.deleteSchedule(empty), "not_found");
+});
+
+test("deleting while students book never leaves bookings on a deleted schedule", async () => {
+  for (let round = 0; round < 5; round++) {
+    const sid = await schedules.createSchedule(courseA, prof.uid, input(), "open");
+    const date = "2027-02-08";
+    const times = ["10:00", "10:30", "11:00", "11:30"];
+    const [del, ...rs] = await Promise.all([
+      schedules.deleteSchedule(sid),
+      ...times.map((t, i) => codeOf(bookings.createBooking({ scheduleId: sid, student: student(16 + i), date, time: t }))),
+    ]);
+    const exists = await schedules.getScheduleInCourse(courseA, sid);
+    const booked = (await bookings.listBookingsForSchedule(sid)).filter((b) => b.status === "booked");
+    if (del === "deleted") {
+      assert.equal(exists, null);
+      assert.equal(booked.length, 0, `round ${round}: bookings left on a deleted schedule (${rs.join(",")})`);
+    } else {
+      assert.equal(del, "has_bookings");
+      assert.equal(exists?.status, "open", `round ${round}: status restored`);
+      assert.ok(booked.length > 0);
+    }
+    // 다음 라운드를 위해 이번 라운드 예약 정리 (교수 잠금이 같은 시각을 막지 않도록)
+    for (const b of booked) await bookings.cancelBooking({ bookingId: b.id, actor: { uid: prof.uid, as: "instructor" } });
+  }
+});
