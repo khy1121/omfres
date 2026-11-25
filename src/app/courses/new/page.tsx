@@ -1,6 +1,7 @@
 import Link from "next/link";
 import CourseForm from "@/components/courses/CourseForm";
-import { btnPrimary, Card } from "@/components/ui";
+import { btnPrimary } from "@/components/styles";
+import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { defaultTerm } from "@/lib/courses/model";
 import { kstYearMonth } from "@/lib/kst";

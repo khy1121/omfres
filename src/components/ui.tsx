@@ -3,19 +3,8 @@
 import { Icon } from "@iconify/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
-export const inputCls =
-  "w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10";
-
-export const btnPrimary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40";
-
-export const btnSecondary =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium text-neutral-900 transition hover:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-40";
-
-export const btnDanger =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40";
-
-export const successCls = "mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900";
+// 클라이언트 컴포넌트 편의를 위해 다시 내보낸다. 서버 컴포넌트는 "./styles"에서 직접 가져와야 한다.
+export { btnDanger, btnPrimary, btnSecondary, inputCls, successCls } from "./styles";
 
 export function BackButton({ onClick, label = "뒤로" }: { onClick: () => void; label?: string }) {
   return (

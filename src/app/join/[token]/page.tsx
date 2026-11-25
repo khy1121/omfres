@@ -1,7 +1,8 @@
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import JoinButton from "@/components/courses/JoinButton";
-import { btnPrimary, btnSecondary, Card } from "@/components/ui";
+import { btnPrimary, btnSecondary } from "@/components/styles";
+import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { getCourseAccess, previewInvite } from "@/lib/data/courses";
 import { INVITE_STATUS_MESSAGE, isInviteTokenFormat } from "@/lib/courses/model";

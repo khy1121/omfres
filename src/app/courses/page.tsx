@@ -1,6 +1,7 @@
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-import { btnPrimary, Card } from "@/components/ui";
+import { btnPrimary } from "@/components/styles";
+import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { listMyCourses, type MyCourse } from "@/lib/data/courses";
 
