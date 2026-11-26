@@ -7,6 +7,7 @@ import { useState } from "react";
 import BookingPicker from "./BookingPicker";
 import BookingItem from "./BookingItem";
 import AddToCalendarButton from "./AddToCalendarButton";
+import NoFitHelp, { type NoFitHelpProps } from "./NoFitHelp";
 import { btnPrimary, btnSecondary, Card, successCls } from "@/components/ui";
 import { fmtDateKo, type SlotConfig } from "@/lib/schedule/rules";
 import type { Booking } from "@/lib/data/bookings";
@@ -22,9 +23,11 @@ type Props = {
   cancelCloseHours: number;
   /** 주소의 ?move=예약ID 로 들어오면 그 예약의 시간 변경부터 시작 */
   initialMoveId: string | null;
+  /** 맞는 시간이 없을 때 안내 (교수 메일·다른 일정) */
+  help: NoFitHelpProps;
 };
 
-export default function StudentSchedulePanel({ courseId, scheduleId, cfg, today, now, myBookings, quota, cancelCloseHours, initialMoveId }: Props) {
+export default function StudentSchedulePanel({ courseId, scheduleId, cfg, today, now, myBookings, quota, cancelCloseHours, initialMoveId, help }: Props) {
   const router = useRouter();
   const active = myBookings.filter((b) => b.status === "booked");
   const [moveId, setMoveId] = useState<string | null>(active.some((b) => b.id === initialMoveId) ? initialMoveId : null);
@@ -110,6 +113,7 @@ export default function StudentSchedulePanel({ courseId, scheduleId, cfg, today,
           </p>
         )}
       </Card>
+      <NoFitHelp {...help} />
     </div>
   );
 }
