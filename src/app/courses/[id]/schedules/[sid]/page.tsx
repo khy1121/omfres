@@ -6,7 +6,7 @@ import { BackLink } from "@/components/courses/BackLink";
 import { Card } from "@/components/ui";
 import { requireViewer } from "@/lib/dal/user";
 import { getCourseAccess } from "@/lib/data/courses";
-import { getScheduleInCourse, isScheduleVisible } from "@/lib/data/schedules";
+import { getScheduleInCourse, isScheduleVisible, listSchedules } from "@/lib/data/schedules";
 import { listBookingsForInstructor, listBookingsForSchedule, listBookingsForStudent, quotaUsed } from "@/lib/data/bookings";
 import { kstToday } from "@/lib/kst";
 import { effectiveCourseRole } from "@/lib/courses/model";
@@ -75,7 +75,11 @@ export default async function SchedulePage({
     );
   }
 
-  const [mine, used] = await Promise.all([listBookingsForStudent(viewer.uid), quotaUsed(schedule.id, viewer.uid)]);
+  const [mine, used, siblings] = await Promise.all([listBookingsForStudent(viewer.uid), quotaUsed(schedule.id, viewer.uid), listSchedules(id)]);
+  // 같은 그룹에서 이 학생에게 열려 있는 다른 일정
+  const others = siblings
+    .filter((s) => s.id !== schedule.id && s.status === "open" && isScheduleVisible(s, viewer.uid, role))
+    .map((s) => ({ id: s.id, title: s.title }));
   const myBookings = mine.filter((b) => b.scheduleId === schedule.id);
   return (
     <main className="px-4 py-8">
@@ -92,6 +96,14 @@ export default async function SchedulePage({
           quota={{ used, max: schedule.maxBookingsPerStudent }}
           cancelCloseHours={schedule.cancelCloseHours}
           initialMoveId={(await searchParams).move ?? null}
+          help={{
+            courseId: id,
+            courseTitle: access.course.title,
+            scheduleTitle: schedule.title,
+            instructorName: access.course.ownerName,
+            instructorEmail: access.course.ownerEmail,
+            others,
+          }}
         />
       </div>
     </main>

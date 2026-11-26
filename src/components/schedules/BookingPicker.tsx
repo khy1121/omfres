@@ -89,6 +89,9 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
   // 가장 빠른 예약 가능 시간 바로 선택. 다른 달이면 달력이 그 달을 보여주도록 다시 그린다.
   const next = summary?.data.next ?? null;
   const [calendarKey, setCalendarKey] = useState(0);
+  // 달력 대신 남은 날짜를 목록으로 훑어보는 보기 (휴대폰에서 편하다)
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const openDates = days ? Object.keys(days).filter((d) => days[d] > 0).sort() : [];
   const pickNext = () => {
     if (!next) return;
     setDate(next.date);
@@ -162,6 +165,48 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
           <span className="shrink-0 text-sm font-semibold">{nextIsSelected ? "선택됨" : "선택 →"}</span>
         </button>
       )}
+      <div className="mb-3 flex justify-end">
+        <div className="flex rounded-lg ring-1 ring-neutral-200" role="group" aria-label="날짜 보기 방식">
+          {(["calendar", "list"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+              className={`flex min-h-10 items-center gap-1 px-3 text-sm first:rounded-l-lg last:rounded-r-lg ${view === v ? "bg-neutral-900 font-semibold text-white" : "bg-white text-neutral-700"}`}
+            >
+              <Icon icon={v === "calendar" ? "lucide:calendar" : "lucide:list"} width={16} />
+              {v === "calendar" ? "달력" : "목록"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {view === "list" ? (
+        !days ? (
+          <p className="flex items-center gap-2 text-sm text-neutral-500">
+            <Icon icon="lucide:loader-2" width={16} className="animate-spin" />
+            불러오는 중…
+          </p>
+        ) : openDates.length === 0 ? (
+          <p className="rounded-lg bg-neutral-100 p-4 text-sm text-neutral-600">지금 예약할 수 있는 날짜가 없습니다.</p>
+        ) : (
+          <ul className="space-y-2" aria-label="예약 가능한 날짜">
+            {openDates.map((d) => (
+              <li key={d}>
+                <button
+                  type="button"
+                  aria-pressed={date === d}
+                  onClick={() => pickDate(d)}
+                  className={`flex min-h-12 w-full items-center justify-between rounded-lg border px-3.5 py-2 text-left text-sm transition ${date === d ? "border-neutral-900 bg-neutral-900 font-semibold text-white" : "border-neutral-300 bg-white hover:border-neutral-900"}`}
+                >
+                  <span>{fmtDateKo(d)}</span>
+                  <span className={date === d ? "text-neutral-200" : "font-semibold text-emerald-700"}>{days[d]}개 남음</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : (
       <Calendar
         key={calendarKey}
         selected={date}
@@ -173,7 +218,8 @@ export default function BookingPicker({ courseId, scheduleId, cfg, today, moving
         unavailableReason={unavailableReason}
         note={note}
       />
-      {days && <p className="mt-2 text-xs text-neutral-500">날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다.</p>}
+      )}
+      {days && view === "calendar" && <p className="mt-2 text-xs text-neutral-500">날짜 아래 숫자는 지금 예약할 수 있는 시간 수입니다.</p>}
 
       {date && (
         <section className="mt-6" aria-labelledby="slots-heading">
